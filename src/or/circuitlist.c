@@ -21,6 +21,7 @@
 #include "connection_edge.h"
 #include "connection_or.h"
 #include "control.h"
+#include "loose.h"
 #include "main.h"
 #include "networkstatus.h"
 #include "nodelist.h"
@@ -43,8 +44,6 @@ static smartlist_t *global_circuitlist = NULL;
 
 /** A list of all the circuits in CIRCUIT_STATE_CHAN_WAIT. */
 static smartlist_t *circuits_pending_chans = NULL;
-
-static void circuit_free_cpath_node(crypt_path_t *victim);
 static void cpath_ref_decref(crypt_path_reference_t *cpath_ref);
 //static void circuit_set_rend_token(or_circuit_t *circ, int is_rend_circ,
 //                                   const uint8_t *token);
@@ -672,7 +671,7 @@ circuit_initial_package_window(void)
 
 /** Initialize the common elements in a circuit_t, and add it to the global
  * list. */
-static void
+void
 init_circuit_base(circuit_t *circ)
 {
   tor_gettimeofday(&circ->timestamp_created);
@@ -740,7 +739,7 @@ or_circuit_new(circid_t p_circ_id, channel_t *p_chan)
 
 /** Deallocate space associated with circ.
  */
-STATIC void
+void
 circuit_free(circuit_t *circ)
 {
   void *mem;
@@ -778,15 +777,23 @@ circuit_free(circuit_t *circ)
     addr_policy_list_free(ocirc->prepend_policy);
   } else {
     or_circuit_t *ocirc = TO_OR_CIRCUIT(circ);
-    /* Remember cell statistics for this circuit before deallocating. */
-    if (get_options()->CellStatistics)
-      rep_hist_buffer_stats_add_circ(circ, time(NULL));
-    mem = ocirc;
-    memlen = sizeof(or_circuit_t);
-    tor_assert(circ->magic == OR_CIRCUIT_MAGIC);
 
-    should_free = (ocirc->workqueue_entry == NULL);
+    if (CIRCUIT_IS_LOOSE(circ)) {
+      loose_or_circuit_t *loose_circ = TO_LOOSE_CIRCUIT(circ);
+      mem = loose_circ;
+      memlen = sizeof(loose_or_circuit_t);
+      tor_assert(circ->magic == LOOSE_OR_CIRCUIT_MAGIC);
+      loose_circuit_free(TO_LOOSE_CIRCUIT(circ));
+    } else {
+      /* Remember cell statistics for this circuit before deallocating. */
+      if (get_options()->CellStatistics)
+        rep_hist_buffer_stats_add_circ(circ, time(NULL));
+      mem = ocirc;
+      memlen = sizeof(or_circuit_t);
+      tor_assert(circ->magic == OR_CIRCUIT_MAGIC);
 
+      should_free = (ocirc->workqueue_entry == NULL);
+    }
     crypto_cipher_free(ocirc->p_crypto);
     crypto_digest_free(ocirc->p_digest);
     crypto_cipher_free(ocirc->n_crypto);
@@ -911,7 +918,7 @@ circuit_free_all(void)
 }
 
 /** Deallocate space associated with the cpath node <b>victim</b>. */
-static void
+void
 circuit_free_cpath_node(crypt_path_t *victim)
 {
   if (!victim)
@@ -2235,16 +2242,23 @@ assert_circuit_ok(const circuit_t *c)
   edge_connection_t *conn;
   const or_circuit_t *or_circ = NULL;
   const origin_circuit_t *origin_circ = NULL;
+  const loose_or_circuit_t *loose_circ = NULL;
 
   tor_assert(c);
-  tor_assert(c->magic == ORIGIN_CIRCUIT_MAGIC || c->magic == OR_CIRCUIT_MAGIC);
+  tor_assert(c->magic == ORIGIN_CIRCUIT_MAGIC ||
+             c->magic == OR_CIRCUIT_MAGIC ||
+             c->magic == LOOSE_OR_CIRCUIT_MAGIC);
   tor_assert(c->purpose >= CIRCUIT_PURPOSE_MIN_ &&
              c->purpose <= CIRCUIT_PURPOSE_MAX_);
 
-  if (CIRCUIT_IS_ORIGIN(c))
+  if (CIRCUIT_IS_ORIGIN(c)) {
     origin_circ = CONST_TO_ORIGIN_CIRCUIT(c);
-  else
+  } else {
+    if (CIRCUIT_IS_LOOSE(c)) {
+      loose_circ = CONST_TO_LOOSE_CIRCUIT(c);
+    }
     or_circ = CONST_TO_OR_CIRCUIT(c);
+  }
 
   if (c->n_chan) {
     tor_assert(!c->n_hop);
@@ -2290,6 +2304,9 @@ assert_circuit_ok(const circuit_t *c)
   }
   if (origin_circ && origin_circ->cpath) {
     assert_cpath_ok(origin_circ->cpath);
+  }
+  if (loose_circ && loose_circ->cpath) {
+    assert_cpath_ok(loose_circ->cpath);
   }
   if (c->purpose == CIRCUIT_PURPOSE_REND_ESTABLISHED) {
     tor_assert(or_circ);

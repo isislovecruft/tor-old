@@ -28,6 +28,7 @@
 #include "control.h"
 #include "directory.h"
 #include "entrynodes.h"
+#include "loose.h"
 #include "main.h"
 #include "microdesc.h"
 #include "networkstatus.h"
@@ -49,26 +50,20 @@
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #endif
 
-static channel_t * channel_connect_for_circuit(const tor_addr_t *addr,
-                                               uint16_t port,
-                                               const char *id_digest);
 static void circuit_list_cpath_impl(crypt_path_t *cpath, smartlist_t *elements,
                                     int verbose, int verbose_names);
 static int circuit_deliver_create_cell(circuit_t *circ,
-                                       const create_cell_t *create_cell,
+                                       const struct create_cell_t *create_cell,
                                        int relayed);
 static int onion_pick_cpath_exit(origin_circuit_t *circ, extend_info_t *exit);
-static crypt_path_t *onion_next_hop_in_cpath(crypt_path_t *cpath);
 static int onion_extend_cpath(origin_circuit_t *circ);
 static int count_acceptable_nodes(smartlist_t *routers);
-static int onion_append_hop(crypt_path_t **head_ptr, extend_info_t *choice);
-static int circuits_can_use_ntor(void);
 
 /** This function tries to get a channel to the specified endpoint,
  * and then calls command_setup_channel() to give it the right
  * callbacks.
  */
-static channel_t *
+channel_t *
 channel_connect_for_circuit(const tor_addr_t *addr, uint16_t port,
                             const char *id_digest)
 {
@@ -371,6 +366,7 @@ circuit_log_path(int severity, unsigned int domain, origin_circuit_t *circ)
  * unable to extend.
  */
 /* XXXX Someday we should learn from OR circuits too. */
+/* XXXX Someday we should probably do this for loose circuits too. -IL */
 void
 circuit_rep_hist_note_result(origin_circuit_t *circ)
 {
@@ -665,9 +661,11 @@ circuit_n_chan_done(channel_t *chan, int status, int close_origin_circuits)
            *     died? */
         }
       } else {
-        /* pull the create cell out of circ->n_chan_create_cell, and send it */
+        /* Pull the create cell out of circ->n_chan_create_cell, and send it.
+         * If this is a loose circuit, then set relayed to false. */
         tor_assert(circ->n_chan_create_cell);
-        if (circuit_deliver_create_cell(circ, circ->n_chan_create_cell, 1)<0) {
+        if (circuit_deliver_create_cell(circ, circ->n_chan_create_cell,
+                                        CIRCUIT_IS_LOOSE(circ) ? 1 : 0) < 0) {
           circuit_mark_for_close(circ, END_CIRC_REASON_RESOURCELIMIT);
           continue;
         }
@@ -797,6 +795,12 @@ should_use_create_fast_for_circuit(origin_circuit_t *circ)
      * Prefer to blend our circuit into the other circuits we are
      * creating on behalf of others. */
     return 0;
+  } else if (bridge_server_mode(options)) {
+    /* We're a bridge, and we know an onion key. However, in order to
+     * appear to be a normal client, we should use CREATE_FAST.
+     * See prop#188.
+     */
+    return 1;
   }
   if (options->FastFirstHopPK == -1) {
     /* option is "auto", so look at the consensus. */
@@ -821,7 +825,7 @@ circuit_timeout_want_to_count_circ(origin_circuit_t *circ)
 /** Return true if the ntor handshake is enabled in the configuration, or if
  * it's been set to "auto" in the configuration and it's enabled in the
  * consensus. */
-static int
+int
 circuits_can_use_ntor(void)
 {
   const or_options_t *options = get_options();
@@ -855,7 +859,7 @@ circuit_pick_create_handshake(uint8_t *cell_type_out,
  * in extending through <b>node</b> to do so, we should use an EXTEND2 or an
  * EXTEND cell to do so, and set *<b>cell_type_out</b> and
  * *<b>create_cell_type_out</b> accordingly. */
-static void
+void
 circuit_pick_extend_handshake(uint8_t *cell_type_out,
                               uint8_t *create_cell_type_out,
                               uint16_t *handshake_type_out,
@@ -1016,6 +1020,11 @@ circuit_send_next_onion_skin(origin_circuit_t *circ)
         if (server_mode(options) && !check_whether_orport_reachable()) {
           inform_testing_reachability();
           consider_testing_reachability(1, 1);
+        }
+        if (bridge_server_mode(options) && !loose_circuits_are_possible) {
+          log_notice(LD_CIRC, "We should now be able to create loose-source "
+                              "routed circuits.");
+          loose_circuits_are_possible = 1;
         }
       }
 
@@ -1420,7 +1429,9 @@ onionskin_answer(or_circuit_t *circ,
   tmp_cpath = tor_malloc_zero(sizeof(crypt_path_t));
   tmp_cpath->magic = CRYPT_PATH_MAGIC;
 
-  circuit_set_state(TO_CIRCUIT(circ), CIRCUIT_STATE_OPEN);
+  if (!CIRCUIT_IS_LOOSE(circ)) {
+    circuit_set_state(TO_CIRCUIT(circ), CIRCUIT_STATE_OPEN);
+  }
 
   log_debug(LD_CIRC,"init digest forward 0x%.8x, backward 0x%.8x.",
             (unsigned int)get_uint32(keys),
@@ -2129,7 +2140,7 @@ onion_append_to_cpath(crypt_path_t **head_ptr, crypt_path_t *new_hop)
  * circuit. In particular, make sure we don't pick the exit node or its
  * family, and make sure we don't duplicate any previous nodes or their
  * families. */
-static const node_t *
+const node_t *
 choose_good_middle_server(uint8_t purpose,
                           cpath_build_state_t *state,
                           crypt_path_t *head,
@@ -2185,6 +2196,7 @@ choose_good_entry_server(uint8_t purpose, cpath_build_state_t *state)
   router_crn_flags_t flags = CRN_NEED_GUARD|CRN_NEED_DESC;
   const node_t *node;
 
+  // XXXprop#188 Why is options->BridgeRelay here?
   if (state && options->UseEntryGuards &&
       (purpose != CIRCUIT_PURPOSE_TESTING || options->BridgeRelay)) {
     /* This request is for an entry server to use for a regular circuit,
@@ -2243,7 +2255,7 @@ choose_good_entry_server(uint8_t purpose, cpath_build_state_t *state)
 
 /** Return the first non-open hop in cpath, or return NULL if all
  * hops are open. */
-static crypt_path_t *
+crypt_path_t *
 onion_next_hop_in_cpath(crypt_path_t *cpath)
 {
   crypt_path_t *hop = cpath;
@@ -2316,7 +2328,7 @@ onion_extend_cpath(origin_circuit_t *circ)
 /** Create a new hop, annotate it with information about its
  * corresponding router <b>choice</b>, and append it to the
  * end of the cpath <b>head_ptr</b>. */
-static int
+int
 onion_append_hop(crypt_path_t **head_ptr, extend_info_t *choice)
 {
   crypt_path_t *hop = tor_malloc_zero(sizeof(crypt_path_t));

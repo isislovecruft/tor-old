@@ -25,6 +25,7 @@
 #include "connection_or.h"
 #include "control.h"
 #include "geoip.h"
+#include "loose.h"
 #include "main.h"
 #include "networkstatus.h"
 #include "nodelist.h"
@@ -86,7 +87,7 @@ static tor_weak_rng_t stream_choice_rng = TOR_WEAK_RNG_INIT;
 /** Update digest from the payload of cell. Assign integrity part to
  * cell.
  */
-static void
+void
 relay_set_digest(crypto_digest_t *digest, cell_t *cell)
 {
   char integrity[4];
@@ -107,7 +108,7 @@ relay_set_digest(crypto_digest_t *digest, cell_t *cell)
  * to 0). If the integrity part is valid, return 1, else restore digest
  * and cell to their original state and return 0.
  */
-static int
+int
 relay_digest_matches(crypto_digest_t *digest, cell_t *cell)
 {
   uint32_t received_integrity, calculated_integrity;
@@ -196,6 +197,21 @@ circuit_receive_relay_cell(cell_t *cell, circuit_t *circ,
   if (relay_crypt(circ, cell, cell_direction, &layer_hint, &recognized) < 0) {
     log_warn(LD_BUG,"relay crypt failed. Dropping connection.");
     return -END_CIRC_REASON_INTERNAL;
+  }
+
+  /* For loose circuits, we treat all cells as recognized. */
+  if (CIRCUIT_IS_LOOSE(circ)) {
+    loose_or_circuit_t *loose_circ = TO_LOOSE_CIRCUIT(circ);
+    int error_reason;
+
+    error_reason = loose_circuit_process_relay_cell(loose_circ, layer_hint,
+                                                    cell, cell_direction,
+                                                    recognized);
+    if (error_reason < 0) {
+      log_warn(LD_OR, "loose_circuit_handle_cell() failed.");
+      return error_reason;
+    }
+    return 0;
   }
 
   if (recognized) {
@@ -555,6 +571,8 @@ relay_command_to_string(uint8_t command)
       return buf;
   }
 }
+
+//XXX prop#188
 
 /** Make a relay cell out of <b>relay_command</b> and <b>payload</b>, and send
  * it onto the open circuit <b>circ</b>. <b>stream_id</b> is the ID on
@@ -1590,6 +1608,7 @@ connection_edge_process_relay_cell(cell_t *cell, circuit_t *circ,
         connection_mark_and_flush(TO_CONN(conn));
       }
       return 0;
+    // prop#188
     case RELAY_COMMAND_EXTEND:
     case RELAY_COMMAND_EXTEND2: {
       static uint64_t total_n_extend=0, total_nonearly=0;
@@ -2613,6 +2632,10 @@ channel_flush_from_first_active_circuit, (channel_t *chan, int max))
       queue = &TO_OR_CIRCUIT(circ)->p_chan_cells;
       streams_blocked = circ->streams_blocked_on_p_chan;
     }
+
+    if (CIRCUIT_IS_LOOSE(circ))
+      log_debug(LD_CIRC, "Circuitmux handed back \"active\" loose circuit %d with "
+                "%d cells queued.", circ->global_circuitlist_idx, queue->n);
 
     /* Circuitmux told us this was active, so it should have cells */
     tor_assert(queue->n > 0);

@@ -527,10 +527,13 @@ typedef enum {
 /** A catch-all for unrecognized purposes. Currently we don't expect
  * to make or see any circuits with this purpose. */
 #define CIRCUIT_PURPOSE_UNKNOWN 255
+//XXXprop#188 Do we want to define a(ny) new circuit purpose(s)?
 
 /** True iff the circuit purpose <b>p</b> is for a circuit that
  * originated at this node. */
-#define CIRCUIT_PURPOSE_IS_ORIGIN(p) ((p)>CIRCUIT_PURPOSE_OR_MAX_)
+#define CIRCUIT_PURPOSE_IS_ORIGIN(p) ((p)>CIRCUIT_PURPOSE_OR_MAX_ && \
+                                      (p)<CIRCUIT_PURPOSE_MAX_    && \
+                                      (p)!=CIRCUIT_PURPOSE_UNKNOWN)
 /** True iff the circuit purpose <b>p</b> is for a circuit that originated
  * here to serve as a client.  (Hidden services don't count here.) */
 #define CIRCUIT_PURPOSE_IS_CLIENT(p)  \
@@ -545,6 +548,8 @@ typedef enum {
 #define CIRCUIT_IS_ORIGIN(c) (((circuit_t *)(c))->magic == ORIGIN_CIRCUIT_MAGIC)
 /** True iff the circuit_t c is actually an or_circuit_t */
 #define CIRCUIT_IS_ORCIRC(c) (((circuit_t *)(c))->magic == OR_CIRCUIT_MAGIC)
+/** True iff the or_circuit_t c is actually a loose_or_circuit_t */
+#define CIRCUIT_IS_LOOSE(c) (((circuit_t *)(c))->magic == LOOSE_OR_CIRCUIT_MAGIC)
 
 /** How many circuits do we want simultaneously in-progress to handle
  * a given stream? */
@@ -2741,6 +2746,8 @@ typedef struct {
 #define ORIGIN_CIRCUIT_MAGIC 0x35315243u
 /** "magic" value for an or_circuit_t */
 #define OR_CIRCUIT_MAGIC 0x98ABC04Fu
+/** "magic" value for a loose-source routed circuit, loose_or_circuit_t */
+#define LOOSE_OR_CIRCUIT_MAGIC 0x13371515u
 /** "magic" value for a circuit that would have been freed by circuit_free,
  * but which we're keeping around until a cpuworker reply arrives.  See
  * circuit_free() for more documentation. */
@@ -3259,8 +3266,43 @@ typedef struct or_circuit_rendinfo_s {
 
 } or_circuit_rendinfo_t;
 
+/** Subtype of or_circuit_t for a loose-source routed circuit, that is, a
+ * circuit which an OR has decided to inject additional hop(s) into the cpath,
+ * prior to the OP's chosen next hop(s).
+ */
+typedef struct loose_or_circuit_t {
+  or_circuit_t or_;
+  /** The doubly-linked list of crypt_path_t entries, one per hop,
+   * for this circuit. This includes ciphers for each hop,
+   * integrity-checking digests for each hop, and package/delivery
+   * windows for each hop.
+   */
+  crypt_path_t *cpath;
+  /** Build state for this circuit. It includes the intended path
+   * length, the chosen exit router, rendezvous information, etc.
+   */
+  cpath_build_state_t *build_state;
+  /** Set if this circuit has already been opened. */
+  unsigned int has_opened : 1;
+  /** Storage for the original create cell from the OP.  This cell is stored
+   * while we are constructin the loose circuit to the additional hops.
+   * Afterwards, we send the created cell in response to this create
+   * cell. This is done to prevent the client from sending relay cells while
+   * we are still adding loose hops. */
+  cell_t *p_chan_create_cell;
+} loose_or_circuit_t;
+
+/** The default number of hops to inject into a loose_or_circuit_t. Used in
+ * src/or/loose.c.
+ */
+#define DEFAULT_LOOSE_ROUTE_LEN 1
+
 /** Convert a circuit subtype to a circuit_t. */
-#define TO_CIRCUIT(x)  (&((x)->base_))
+#define TO_CIRCUIT(x)  (&(((x)->base_)))
+/** Cast a loose_or_circuit_t subtype pointer to an or_circuit_t. */
+#define LOOSE_TO_OR_CIRCUIT(x)  (&(((x))->or_))
+/** Cast a loose_or_circuit_t subtype pointer to a circuit_t. */
+#define LOOSE_TO_CIRCUIT(x) (TO_CIRCUIT(LOOSE_TO_OR_CIRCUIT(x)))
 
 /** Convert a circuit_t* to a pointer to the enclosing or_circuit_t.  Assert
  * if the cast is impossible. */
@@ -3270,6 +3312,14 @@ static const or_circuit_t *CONST_TO_OR_CIRCUIT(const circuit_t *);
  * Assert if the cast is impossible. */
 static origin_circuit_t *TO_ORIGIN_CIRCUIT(circuit_t *);
 static const origin_circuit_t *CONST_TO_ORIGIN_CIRCUIT(const circuit_t *);
+/** Convert a circuit_t* to a pointer to the enclosing loose_or_circuit_t.
+ * Assert if the cast is impossible. */
+static loose_or_circuit_t *TO_LOOSE_CIRCUIT(circuit_t *);
+static const loose_or_circuit_t *CONST_TO_LOOSE_CIRCUIT(const circuit_t *);
+/** Convert an or_circuit_t* to a pointer to the enclosing loose_or_circuit_t.
+ * Assert if the cast is impossible. */
+static loose_or_circuit_t *OR_TO_LOOSE_CIRCUIT(or_circuit_t *);
+static const loose_or_circuit_t *CONST_OR_TO_LOOSE_CIRCUIT(const or_circuit_t *);
 
 /** Return 1 iff <b>node</b> has Exit flag and no BadExit flag.
  * Otherwise, return 0.
@@ -3281,12 +3331,14 @@ static INLINE int node_is_good_exit(const node_t *node)
 
 static INLINE or_circuit_t *TO_OR_CIRCUIT(circuit_t *x)
 {
-  tor_assert(x->magic == OR_CIRCUIT_MAGIC);
+  tor_assert(x->magic == OR_CIRCUIT_MAGIC ||
+             x->magic == LOOSE_OR_CIRCUIT_MAGIC);
   return DOWNCAST(or_circuit_t, x);
 }
 static INLINE const or_circuit_t *CONST_TO_OR_CIRCUIT(const circuit_t *x)
 {
-  tor_assert(x->magic == OR_CIRCUIT_MAGIC);
+  tor_assert(x->magic == OR_CIRCUIT_MAGIC ||
+             x->magic == LOOSE_OR_CIRCUIT_MAGIC);
   return DOWNCAST(or_circuit_t, x);
 }
 static INLINE origin_circuit_t *TO_ORIGIN_CIRCUIT(circuit_t *x)
@@ -3299,6 +3351,26 @@ static INLINE const origin_circuit_t *CONST_TO_ORIGIN_CIRCUIT(
 {
   tor_assert(x->magic == ORIGIN_CIRCUIT_MAGIC);
   return DOWNCAST(origin_circuit_t, x);
+}
+static INLINE loose_or_circuit_t *TO_LOOSE_CIRCUIT(circuit_t *x)
+{
+  tor_assert(x->magic == LOOSE_OR_CIRCUIT_MAGIC);
+  return (loose_or_circuit_t *) SUBTYPE_P(x, loose_or_circuit_t, or_.base_);
+}
+static INLINE const loose_or_circuit_t *CONST_TO_LOOSE_CIRCUIT(const circuit_t *x)
+{
+  tor_assert(x->magic == LOOSE_OR_CIRCUIT_MAGIC);
+  return (const loose_or_circuit_t *) SUBTYPE_P(x, loose_or_circuit_t, or_.base_);
+}
+static INLINE loose_or_circuit_t *OR_TO_LOOSE_CIRCUIT(or_circuit_t *x)
+{
+  tor_assert(x->base_.magic == OR_CIRCUIT_MAGIC);
+  return (loose_or_circuit_t *) SUBTYPE_P(x, loose_or_circuit_t, or_);
+}
+static INLINE const loose_or_circuit_t *CONST_OR_TO_LOOSE_CIRCUIT(const or_circuit_t *x)
+{
+  tor_assert(x->base_.magic == OR_CIRCUIT_MAGIC);
+  return (const loose_or_circuit_t *) SUBTYPE_P(x, loose_or_circuit_t, or_);
 }
 
 /** Bitfield type: things that we're willing to use invalid routers for. */
