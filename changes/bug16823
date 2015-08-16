@@ -1,0 +1,3 @@
+  o Major bugfixes (security, relay):
+    - Fix potential double-free when handling CREATE_FAST cells from
+      clients. Fixes bug 16823; bugfix on 0.2.4.8-alpha.
