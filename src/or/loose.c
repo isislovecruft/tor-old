@@ -621,10 +621,6 @@ loose_circuit_create(loose_or_circuit_t *loose_circ)
     cc->cell_type = CELL_CREATE_FAST;
     cc->handshake_type = ONION_HANDSHAKE_TYPE_FAST;
     note_request("cell: create fast", 1);
-    log_info(LD_OR,
-             "Sending %s cell to first additional hop %s in loose circuit.",
-             cell_command_to_string(cc->cell_type),
-             safe_str(extend_info_describe(loose_circ->cpath->extend_info)));
   } else {
     log_warn(LD_CIRC, "Don't know how to use a CREATE or CREATE2 cell to "
                       "establish a circuit to our first additional hop.");
