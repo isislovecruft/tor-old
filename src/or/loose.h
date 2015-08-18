@@ -51,6 +51,8 @@ STATIC loose_or_circuit_t* loose_or_circuit_init(circid_t circ_id, channel_t *p_
                                                  uint8_t purpose, int flags);
 STATIC extend_info_t* loose_circuit_pick_cpath_entry(loose_or_circuit_t *loose_circ,
                                                      extend_info_t *entry);
+STATIC void loose_circuit_log_path(int severity, unsigned int domain,
+                                   const loose_or_circuit_t *loose_circ);
 
 /** Function for handling extra tasks when a loose circuit has completed. */
 STATIC void loose_circuit_has_opened(loose_or_circuit_t *loose_circ);

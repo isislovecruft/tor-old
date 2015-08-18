@@ -36,8 +36,6 @@ static int loose_count_acceptable_nodes(void);
 static char* loose_circuit_list_path(const loose_or_circuit_t *loose_circ, int verbose);
 static char* loose_circuit_list_path_impl(const loose_or_circuit_t *loose_circ,
                                           int verbose, int verbose_names);
-static void loose_circuit_log_path(int severity, unsigned int domain,
-                                   const loose_or_circuit_t *loose_circ);
 
 /** Functions for choosing additional hops in a loose-source routed circuit. */
 static int loose_circuit_extend_cpath(loose_or_circuit_t *loose_circ,
@@ -503,7 +501,7 @@ loose_circuit_list_path(const loose_or_circuit_t *loose_circ, int verbose)
  * This is done by calling loose_circuit_list_path(), logging the returned
  * string, and then freeing it.
  */
-static void
+STATIC void
 loose_circuit_log_path(int severity, unsigned int domain,
                        const loose_or_circuit_t *loose_circ)
 {
