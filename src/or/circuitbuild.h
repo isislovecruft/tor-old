@@ -73,8 +73,8 @@ void extend_info_free(extend_info_t *info);
 const node_t *build_state_get_exit_node(cpath_build_state_t *state);
 const char *build_state_get_exit_nickname(cpath_build_state_t *state);
 
-const node_t *choose_good_entry_server(uint8_t purpose,
-                                       cpath_build_state_t *state);
+MOCK_DECL(const node_t *,
+          choose_good_entry_server, (uint8_t purpose, cpath_build_state_t *state));
 
 #ifdef CIRCUITBUILD_PRIVATE
 STATIC circid_t get_unique_circ_id_by_chan(channel_t *chan);

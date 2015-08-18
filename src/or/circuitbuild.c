@@ -2187,8 +2187,8 @@ choose_good_middle_server(uint8_t purpose,
  * guard, not for any particular circuit.
  */
 /* XXXX024 I'd like to have this be static again, but entrynodes.c needs it. */
-const node_t *
-choose_good_entry_server(uint8_t purpose, cpath_build_state_t *state)
+MOCK_IMPL(const node_t *,
+choose_good_entry_server,(uint8_t purpose, cpath_build_state_t *state))
 {
   const node_t *choice;
   smartlist_t *excluded;
