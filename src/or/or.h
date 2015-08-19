@@ -3284,12 +3284,13 @@ typedef struct loose_or_circuit_t {
   cpath_build_state_t *build_state;
   /** Set if this circuit has already been opened. */
   unsigned int has_opened : 1;
-  /** Storage for the original create cell from the OP.  This cell is stored
-   * while we are constructin the loose circuit to the additional hops.
-   * Afterwards, we send the created cell in response to this create
-   * cell. This is done to prevent the client from sending relay cells while
-   * we are still adding loose hops. */
-  cell_t *p_chan_create_cell;
+  /** Storage for the first relay_early cell received from the client.  This
+   * cell is stored while we are extending the loose circuit to the additional
+   * hops.  Afterwards, <b>p_chan_relay_cell</b> will be relayed to its
+   * intended recipient, through the additional hops.  This is done to prevent
+   * the client from sending additional relay cells while we are still
+   * constructing the loose circuit. */
+  cell_t *p_chan_relay_cell;
 } loose_or_circuit_t;
 
 /** The default number of hops to inject into a loose_or_circuit_t. Used in

@@ -28,6 +28,9 @@ origin_circuit_t *circuit_establish_circuit(uint8_t purpose,
 int circuit_handle_first_hop(origin_circuit_t *circ);
 void circuit_n_chan_done(channel_t *chan, int status,
                          int close_origin_circuits);
+int circuit_deliver_create_cell(circuit_t *circ,
+                                const struct create_cell_t *create_cell,
+                                int relayed);
 int inform_testing_reachability(void);
 int circuit_timeout_want_to_count_circ(origin_circuit_t *circ);
 int cpath_supports_ntor(crypt_path_t *const cpath_orig);

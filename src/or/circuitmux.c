@@ -1115,7 +1115,7 @@ circuitmux_detach_circuit,(circuitmux_t *cmux, circuit_t *circ))
 
   /* Got one? If not, see if it's an or_circuit_t and try p_chan/p_circ_id */
   if (!hashent) {
-    if (circ->magic == OR_CIRCUIT_MAGIC) {
+    if (CIRCUIT_IS_ORCIRC(circ) || CIRCUIT_IS_LOOSE(circ)) {
       search.circ_id = TO_OR_CIRCUIT(circ)->p_circ_id;
       if (TO_OR_CIRCUIT(circ)->p_chan) {
         search.chan_id = TO_OR_CIRCUIT(circ)->p_chan->global_identifier;

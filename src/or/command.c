@@ -279,6 +279,7 @@ command_process_create_cell(cell_t *cell, channel_t *chan)
   loose_or_circuit_t *loose_circ;
   const or_options_t *options = get_options();
   int id_is_high;
+  int reason;
 
   tor_assert(cell);
   tor_assert(chan);
@@ -367,21 +368,28 @@ command_process_create_cell(cell_t *cell, channel_t *chan)
    */
   if (bridge_server_mode(options) && channel_is_incoming(chan) &&
       loose_circuits_are_possible) {
+    circuit_t *circ;
+
+    circ = circuit_get_by_circid_channel(cell->circ_id, chan);
+    if (circ) {
+      log_debug(LD_CIRC,
+                "Got a create cell for loose_circ %d, which already exists!",
+                circ->global_circuitlist_idx);
+      return;
+    }
+
     loose_circ = loose_circuit_establish_circuit(cell->circ_id, chan, NULL,
-                                                 0, CIRCUIT_PURPOSE_OR, 0, cell);
+                                                 0, CIRCUIT_PURPOSE_OR, 0);
     if (!loose_circ) {
-      log_warn(LD_OR, "Failed to establish loose circuit in response to client "
-                      "create cell. Closing OR circuit.");
+      log_warn(LD_OR, "Failed to establish loose circuit.");
+    } else {
+      loose_circuit_answer_create_cell(loose_circ, cell);
     }
   } else {
-    int reason;
-
     or_circ = or_circuit_new(cell->circ_id, chan);
     or_circ->base_.purpose = CIRCUIT_PURPOSE_OR;
     circuit_set_state(TO_CIRCUIT(or_circ), CIRCUIT_STATE_ONIONSKIN_PENDING);
 
-    /* Loose circuits will answer the OP with a created cell when
-     * loose_circuit_has_opened() is called. */
     if ((reason = command_answer_create_cell(TO_CIRCUIT(or_circ), chan, cell)) < 0) {
       circuit_mark_for_close(TO_CIRCUIT(or_circ), -reason);
     }

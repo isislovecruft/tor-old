@@ -56,7 +56,8 @@ static int loose_circuit_relay_cell_outgoing(loose_or_circuit_t *loose_circ,
                                              cell_t *cell, cell_direction_t cell_direction);
 
 
-/** If 1, then we've successfully established a client circuit, and therefore
+/**
+ * If 1, then we've successfully established a client circuit, and therefore
  * it's reasonable to believe we can handle creating loose circuits.
  */
 char loose_circuits_are_possible = 0;
@@ -187,7 +188,7 @@ loose_or_circuit_init(circid_t circ_id, channel_t *p_chan,
 loose_or_circuit_t *
 loose_circuit_establish_circuit(circid_t circ_id, channel_t *p_chan,
                                 extend_info_t *entry, int len,
-                                uint8_t purpose, int flags, cell_t *cell)
+                                uint8_t purpose, int flags)
 {
   loose_or_circuit_t *loose_circ;
   int err_reason = 0;
@@ -203,12 +204,6 @@ loose_circuit_establish_circuit(circid_t circ_id, channel_t *p_chan,
 
   loose_circ = loose_or_circuit_init(circ_id, p_chan, purpose, flags);
   log_debug(LD_CIRC, "Establishing loose circuit...");
-
-  /* Allocate space for loose_circ->p_chan_create_cell and copy it */
-  if (cell) {
-    loose_circ->p_chan_create_cell = tor_malloc_zero(sizeof(cell_t));
-    loose_circ->p_chan_create_cell = cell;
-  }
 
   /* Determine the appropriate path length and store it in the state. */
   length = (len > 0) ? len : DEFAULT_LOOSE_ROUTE_LEN; // XXX cap to maximum?
@@ -463,8 +458,7 @@ loose_circuit_list_path_impl(const loose_or_circuit_t *loose_circ,
   if (verbose) {
     const char *nickname = build_state_get_exit_nickname(loose_circ->build_state);
     smartlist_add_asprintf(
-      elements, "%s%s circ (length %d%s%s):",
-      loose_circ->build_state->is_internal ? "internal" : "exit",
+      elements, "loose%s circ (length %d%s%s):",
       loose_circ->build_state->need_uptime ? " (high-uptime)" : "",
       loose_circ->build_state->desired_path_len,
       (LOOSE_TO_CIRCUIT(loose_circ))->state == CIRCUIT_STATE_OPEN ? "" : ", last hop ",
@@ -607,6 +601,7 @@ loose_circuit_handle_first_hop(loose_or_circuit_t *loose_circ)
 int
 loose_circuit_create(loose_or_circuit_t *loose_circ)
 {
+  circuit_t *circ;
   create_cell_t *cc;
   int len;
 
@@ -615,9 +610,15 @@ loose_circuit_create(loose_or_circuit_t *loose_circ)
     return -END_CIRC_REASON_INTERNAL;
   }
 
+  circ = LOOSE_TO_CIRCUIT(loose_circ);
+
+  /* Make sure we haven't already stored a create cell. */
+  tor_assert(!circ->n_chan_create_cell);
+
+  /* Allocate memory for a create cell and start making it. */
   cc = tor_malloc_zero(sizeof(create_cell_t));
 
-  if (loose_circuit_should_use_create_fast() != 0) {
+  if (PREDICT_LIKELY(loose_circuit_should_use_create_fast())) {
     cc->cell_type = CELL_CREATE_FAST;
     cc->handshake_type = ONION_HANDSHAKE_TYPE_FAST;
     note_request("cell: create fast", 1);
@@ -628,9 +629,10 @@ loose_circuit_create(loose_or_circuit_t *loose_circ)
   }
 
   log_debug(LD_CIRC,
-            "Creating onionskin with %s cell for hop %s on loose circuit.",
+            "Creating onionskin with %s cell for hop %s on loose circuit %d.",
             cell_command_to_string(cc->cell_type),
-            safe_str(extend_info_describe(loose_circ->cpath->extend_info)));
+            safe_str(extend_info_describe(loose_circ->cpath->extend_info)),
+            circ->global_circuitlist_idx);
   len = onion_skin_create(cc->handshake_type,
                           loose_circ->cpath->extend_info,
                           &loose_circ->cpath->handshake_state,
@@ -644,37 +646,48 @@ loose_circuit_create(loose_or_circuit_t *loose_circ)
   /* For the following to have effect, the circuit should be in
    * CIRCUIT_STATE_CHAN_WAIT (in order to get circuit_n_chan_done() to call
    * circuit_deliver_create_cell() with the stored create cell for us. */
-  LOOSE_TO_CIRCUIT(loose_circ)->n_chan_create_cell = cc;
-  log_debug(LD_CIRC,
-            "Loose circuit n_chan is %s. (expected: \"%s\" or \"%s\")",
-            circuit_state_to_string(LOOSE_TO_CIRCUIT(loose_circ)->state),
-            circuit_state_to_string(CIRCUIT_STATE_CHAN_WAIT),
-            circuit_state_to_string(CIRCUIT_STATE_OPEN));
+  circ->n_chan_create_cell = cc;
+  circuit_set_state(circ, CIRCUIT_STATE_CHAN_WAIT);
 
-  /* Set the circuit state to CIRCUIT_STATE_CHAN_WAIT so that
-   * circuit_n_chan_done() can find our circuit and deliver the stored
-   * create cell. */
-  circuit_set_state(LOOSE_TO_CIRCUIT(loose_circ), CIRCUIT_STATE_CHAN_WAIT);
+  log_debug(LD_CIRC, "Sending %s cell to %s for loose circuit %d.",
+            cell_command_to_string(cc->cell_type),
+            safe_str(extend_info_describe(loose_circ->cpath->extend_info)),
+            circ->global_circuitlist_idx);
 
-  /*
-  if (LOOSE_TO_CIRCUIT(loose_circ)->state == CIRCUIT_STATE_OPEN) {
-    log_debug(LD_CIRC,
-              "Channel to first hop %s was already open! "
-              "Sending %s cell to %s for loose circuit...",
-              safe_str(extend_info_describe(loose_circ->cpath->extend_info)),
-              cell_command_to_string(cc->cell_type),
-              safe_str(extend_info_describe(loose_circ->cpath->extend_info)));
-    if (circuit_deliver_create_cell(
-         LOOSE_TO_CIRCUIT(loose_circ),
-         LOOSE_TO_CIRCUIT(loose_circ)->n_chan_create_cell, 0) < 0) {
-      return -END_CIRC_REASON_RESOURCELIMIT;
-    }
+  if (circuit_deliver_create_cell(circ, circ->n_chan_create_cell, 0) < 0) {
+    return -END_CIRC_REASON_RESOURCELIMIT;
+  }
+  tor_free(circ->n_chan_create_cell);
 
-    circuit_set_state(LOOSE_TO_CIRCUIT(loose_circ), CIRCUIT_STATE_BUILDING);
-  } */
-
+  circuit_set_state(circ, CIRCUIT_STATE_BUILDING);
   loose_circ->cpath->state = CPATH_STATE_AWAITING_KEYS;
   return 0;
+}
+
+/**
+ * DOCDOC
+ */
+void
+loose_circuit_answer_create_cell(loose_or_circuit_t *loose_circ, cell_t *cell)
+{
+  circuit_t *circ;
+  channel_t *chan;
+  int reason;
+
+  tor_assert(cell);
+  tor_assert(loose_circ);
+
+  circ = LOOSE_TO_CIRCUIT(loose_circ);
+  chan = LOOSE_TO_OR_CIRCUIT(loose_circ)->p_chan;
+  tor_assert(chan);
+
+  log_debug(LD_CIRC, "Answering create cell for loose circuit %d...",
+                     circ->global_circuitlist_idx);
+
+  if ((reason = command_answer_create_cell(circ, chan, cell)) < 0) {
+    log_warn(LD_CIRC, "Error while responding to create cell for loose circuit.");
+    circuit_mark_for_close(LOOSE_TO_CIRCUIT(loose_circ), -reason);
+  }
 }
 
 /**
@@ -832,8 +845,6 @@ loose_count_acceptable_nodes(void)
 STATIC void
 loose_circuit_has_opened(loose_or_circuit_t *loose_circ)
 {
-  int reason;
-
   /* Mark that this circuit has been successfully opened, that we can treat it
    * differently in the case that we try to extend it further later. */
   loose_circ->has_opened = 1;
@@ -851,27 +862,9 @@ loose_circuit_has_opened(loose_or_circuit_t *loose_circ)
     clear_broken_connection_map(1);
   }
 
-  /* Free the create cell stored in circ->n_chan_create_cell. */
-  //tor_free(LOOSE_TO_CIRCUIT(loose_circ)->n_chan_create_cell);  // XXX
-  //LOOSE_TO_CIRCUIT(loose_circ)->n_chan_create_cell = NULL;
-
   circuit_set_state(LOOSE_TO_CIRCUIT(loose_circ), CIRCUIT_STATE_OPEN);
-  log_info(LD_CIRC, "Loose circuit built!");
-
-  if (loose_circ->p_chan_create_cell) {
-    log_debug(LD_CIRC, "Sending created cell back to OP...");
-    reason = command_answer_create_cell(LOOSE_TO_CIRCUIT(loose_circ),
-                                        LOOSE_TO_OR_CIRCUIT(loose_circ)->p_chan,
-                                        loose_circ->p_chan_create_cell);
-    if (reason < 0) {
-      log_warn(LD_CIRC,
-               "Error while responding to OP create cell for loose circuit.");
-      circuit_mark_for_close(LOOSE_TO_CIRCUIT(loose_circ), reason);
-    }
-    log_debug(LD_CIRC, "Finished sending CREATED to OP on loose circuit %d",
-                       LOOSE_TO_CIRCUIT(loose_circ)->global_circuitlist_idx);
-    tor_free(loose_circ->p_chan_create_cell);
-  }
+  log_info(LD_CIRC, "Loose circuit %d built!",
+           LOOSE_TO_CIRCUIT(loose_circ)->global_circuitlist_idx);
 }
 
 /**
@@ -1014,8 +1007,9 @@ loose_circuit_relay_cell_incoming(loose_or_circuit_t *loose_circ,
   crypt_path_t *cpath;
   relay_header_t rh;
 
-  log_debug(LD_OR, "Handling incoming relay cell type %d on loose circuit %d.",
-            cell->command, LOOSE_TO_CIRCUIT(loose_circ)->global_circuitlist_idx);
+  log_debug(LD_OR, "Handling incoming %s cell on loose circuit %d.",
+            cell_command_to_string(cell->command),
+            LOOSE_TO_CIRCUIT(loose_circ)->global_circuitlist_idx);
 
   /* Set the circ_id to the one for the previous hop. */
   cell->circ_id = LOOSE_TO_OR_CIRCUIT(loose_circ)->p_circ_id;
@@ -1091,16 +1085,14 @@ loose_circuit_relay_cell_outgoing(loose_or_circuit_t *loose_circ,
   log_debug(LD_OR, "Handling outgoing relay cell type %d on loose circuit %d.",
             cell->command, LOOSE_TO_CIRCUIT(loose_circ)->global_circuitlist_idx);
 
+  tor_assert(loose_circ->cpath);
+
   /* Set the circ_id to the one for the next hop. */
   cell->circ_id = LOOSE_TO_CIRCUIT(loose_circ)->n_circ_id;
   chan = LOOSE_TO_CIRCUIT(loose_circ)->n_chan;
-
-  tor_assert(loose_circ);
-  tor_assert(loose_circ->cpath);
-  tor_assert(loose_circ->cpath->prev);
   this_hop = loose_circ->cpath->prev; /* Take the last loose hop first. */
 
-  tor_assert(this_hop->f_digest);  // XXX We don't have f_digest
+  tor_assert(this_hop->f_digest);
   relay_set_digest(this_hop->f_digest, cell);
 
   /* Iterate through all the additional hops in our loose_circ->cpath (in
@@ -1182,15 +1174,48 @@ loose_circuit_process_relay_cell(loose_or_circuit_t *loose_circ,
                                  cell_t *cell, cell_direction_t cell_direction,
                                  char recognized)
 {
-  static int num_seen = 0;
+  static uint64_t num_seen = 0; /** The number of relay cells we've seen. */
   int reason = 0;
 
+  tor_assert(cell);
   tor_assert(loose_circ);
   tor_assert(CIRCUIT_IS_LOOSE(loose_circ));
-  tor_assert(cell);
   tor_assert(cell_direction == CELL_DIRECTION_IN ||
              cell_direction == CELL_DIRECTION_OUT);
 
+  if (!loose_circ->has_opened) {
+    /* Store the first relay_early cell for later, after our loose circuit is
+     * fully constructed. */
+    log_info(LD_CIRC,
+             "Received %s command on loose circuit %d, but we haven't finished "
+             "constructing the extra hops in this circuit! Saving for later.",
+             cell_command_to_string(cell->command),
+             LOOSE_TO_CIRCUIT(loose_circ)->global_circuitlist_idx);
+
+    ++num_seen;
+    loose_circ->p_chan_relay_cell = tor_malloc_zero(sizeof(cell_t));
+    loose_circ->p_chan_relay_cell = cell;
+    return 0;
+  } else if (loose_circ->p_chan_relay_cell) {
+    /* If we previously stored a relay_early cell, then we should send it. */
+    int raison;
+
+    log_info(LD_CIRC, "Sending previously stored relay cell loose_circuit %d.",
+                      LOOSE_TO_CIRCUIT(loose_circ)->global_circuitlist_idx);
+
+    raison = loose_circuit_relay_cell_outgoing(loose_circ, NULL,  /* layer_hint */
+                                               loose_circ->p_chan_relay_cell,
+                                               CELL_DIRECTION_OUT);
+    if (raison < 0) {
+      log_debug(LD_CIRC, "Problem sending stored relay_early cell.");
+      return raison;
+    }
+    tor_free(loose_circ->p_chan_relay_cell);
+
+    ++stats_n_relay_cells_delivered;
+  }
+
+  /* Otherwise process the cell we just received. */
   ++num_seen;
   ++stats_n_relay_cells_delivered;
   log_debug(LD_OR,
@@ -1218,7 +1243,6 @@ loose_circuit_process_relay_cell(loose_or_circuit_t *loose_circ,
     return loose_circuit_relay_cell_incoming(loose_circ, layer_hint,
                                              cell, cell_direction);
   }
-
   log_warn(LD_OR, "Direction for relay cell on loose circuit was neither "
                   "in nor out? Closing.");
   return -END_CIRC_REASON_INTERNAL;

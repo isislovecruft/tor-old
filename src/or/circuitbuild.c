@@ -52,9 +52,6 @@
 
 static void circuit_list_cpath_impl(crypt_path_t *cpath, smartlist_t *elements,
                                     int verbose, int verbose_names);
-static int circuit_deliver_create_cell(circuit_t *circ,
-                                       const struct create_cell_t *create_cell,
-                                       int relayed);
 static int onion_pick_cpath_exit(origin_circuit_t *circ, extend_info_t *exit);
 static int onion_extend_cpath(origin_circuit_t *circ);
 static int count_acceptable_nodes(smartlist_t *routers);
@@ -665,7 +662,7 @@ circuit_n_chan_done(channel_t *chan, int status, int close_origin_circuits)
          * If this is a loose circuit, then set relayed to false. */
         tor_assert(circ->n_chan_create_cell);
         if (circuit_deliver_create_cell(circ, circ->n_chan_create_cell,
-                                        CIRCUIT_IS_LOOSE(circ) ? 1 : 0) < 0) {
+                                        CIRCUIT_IS_LOOSE(circ) ? 0 : 1) < 0) {
           circuit_mark_for_close(circ, END_CIRC_REASON_RESOURCELIMIT);
           continue;
         }
@@ -685,7 +682,7 @@ circuit_n_chan_done(channel_t *chan, int status, int close_origin_circuits)
  * gave us via an EXTEND cell, so we shouldn't worry if we don't understand
  * it. Return -1 if we failed to find a suitable circid, else return 0.
  */
-static int
+int
 circuit_deliver_create_cell(circuit_t *circ, const create_cell_t *create_cell,
                             int relayed)
 {

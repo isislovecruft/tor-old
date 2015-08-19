@@ -8,8 +8,8 @@
  * \brief Header file for loose.c.
  **/
 
-#ifndef TOR_BRIDGEGUARD_H
-#define TOR_BRIDGEGUARD_H
+#ifndef TOR_LOOSE_H
+#define TOR_LOOSE_H
 
 #include "onion.h"
 #include "testsupport.h"
@@ -24,7 +24,7 @@ void loose_note_that_we_maybe_cant_complete_circuits(void);
 /** Functions for creating loose circuits. */
 loose_or_circuit_t* loose_circuit_establish_circuit(circid_t circ_id, channel_t *p_chan,
                                                     extend_info_t *entry, int len,
-                                                    uint8_t purpose, int flags, cell_t *cell);
+                                                    uint8_t purpose, int flags);
 
 /** Function for freeing loose circuits.  Used in circuit_free(). */
 void loose_circuit_free(loose_or_circuit_t *loose_circ);
@@ -38,6 +38,8 @@ int loose_circuit_process_relay_cell(loose_or_circuit_t *loose_circ,
                                      crypt_path_t *layer_hint,
                                      cell_t *cell, cell_direction_t cell_direction,
                                      char recognized);
+void loose_circuit_store_create_cell(loose_or_circuit_t *loose_circ, cell_t *cell);
+void loose_circuit_answer_create_cell(loose_or_circuit_t *loose_circ, cell_t *cell);
 MOCK_DECL(int, loose_circuit_send_next_onion_skin,(loose_or_circuit_t *loose_circ));
 
 
