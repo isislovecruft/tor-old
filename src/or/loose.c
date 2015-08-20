@@ -1266,19 +1266,12 @@ loose_circuit_process_relay_cell(loose_or_circuit_t *loose_circ,
 MOCK_IMPL(int,
 loose_circuit_send_next_onion_skin,(loose_or_circuit_t *loose_circ))
 {
-  int reason;
+  int reason = 0;
 
   if (loose_circ->cpath->state == CPATH_STATE_CLOSED) {
-    log_debug(LD_CIRC, "Doing loose_circuit_create()...");
     reason = loose_circuit_send_create_cell(loose_circ);
-
-    if (reason < 0) {
-      return reason;
-    }
   } else {
-    log_debug(LD_CIRC, "Doing loose_circuit_extend()...");
-    return loose_circuit_extend(loose_circ);
+    reason = loose_circuit_extend(loose_circ);
   }
-
-  return 0;
+  return reason;
 }
