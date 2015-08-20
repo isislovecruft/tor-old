@@ -29,7 +29,7 @@
 
 
 static loose_or_circuit_t* loose_or_circuit_new(circid_t circ_id, channel_t *p_chan);
-STATIC void loose_circuit_clear_cpath(loose_or_circuit_t *loose_circ);
+static void loose_circuit_clear_cpath(loose_or_circuit_t *loose_circ);
 
 /** Functions for getting information about a loose circuit's additional hops. */
 static int loose_count_acceptable_nodes(void);
@@ -377,7 +377,7 @@ loose_circuit_populate_cpath(loose_or_circuit_t *loose_circ,
  *
  * Blatantly copied from circuit_clear_cpath().
  */
-STATIC void
+static void
 loose_circuit_clear_cpath(loose_or_circuit_t *loose_circ)
 {
   crypt_path_t *victim, *head, *cpath;
