@@ -864,7 +864,7 @@ loose_circuit_has_opened(loose_or_circuit_t *loose_circ)
   /* If this is the first (recent) loose circuit we've built, then note so,
    * and clear the state storing information on whether we're online/offline
    * or have broken connections. */
-  if (!loose_have_completed_a_circuit()) {
+  if (PREDICT_UNLIKELY(!loose_have_completed_a_circuit())) {
     loose_note_that_we_completed_a_circuit();
     log_notice(LD_GENERAL, "Tor has successfully constructed a "
                            "loose-source routed circuit.");
@@ -1033,7 +1033,7 @@ loose_circuit_relay_cell_incoming(loose_or_circuit_t *loose_circ,
   /* Iterate through all the additional hops in our loose_circ->cpath (in
    * forward order) and decrypt the cell w.r.t. each hop in turn. */ 
   do {
-    if (!this_hop) {
+    if (PREDICT_UNLIKELY(!this_hop)) {
       log_warn(LD_OR, "Additional hop for loose circuit was strangely "
                       "missing! Closing circuit.");
       return -END_CIRC_REASON_INTERNAL;
@@ -1108,7 +1108,7 @@ loose_circuit_relay_cell_outgoing(loose_or_circuit_t *loose_circ,
   /* Iterate through all the additional hops in our loose_circ->cpath (in
    * reverse) and encrypt the cell to each hop in turn. */ 
   do {
-    if (!this_hop) {
+    if (PREDICT_UNLIKELY(!this_hop)) {
       log_warn(LD_OR, "Additional hop for loose circuit was strangely "
                       "missing! Closing circuit.");
       return -END_CIRC_REASON_INTERNAL;
@@ -1200,7 +1200,7 @@ loose_circuit_process_relay_cell(loose_or_circuit_t *loose_circ,
   tor_assert(cell_direction == CELL_DIRECTION_IN ||
              cell_direction == CELL_DIRECTION_OUT);
 
-  if (!loose_circ->has_opened) {
+  if (PREDICT_UNLIKELY(!loose_circ->has_opened)) {
     /* Store the first relay_early cell for later, after our loose circuit is
      * fully constructed. */
     log_info(LD_CIRC,
@@ -1213,7 +1213,7 @@ loose_circuit_process_relay_cell(loose_or_circuit_t *loose_circ,
     loose_circ->p_chan_relay_cell = tor_malloc_zero(sizeof(cell_t));
     loose_circ->p_chan_relay_cell = cell;
     return 0;
-  } else if (loose_circ->p_chan_relay_cell) {
+  } else if (PREDICT_UNLIKELY(loose_circ->p_chan_relay_cell)) {
     /* If we previously stored a relay_early cell, then we should send it. */
     int raison;
 
@@ -1246,19 +1246,18 @@ loose_circuit_process_relay_cell(loose_or_circuit_t *loose_circ,
   }
   ++stats_n_relay_cells_delivered;
 
-  /* Heading towards the OP's next chosen hop. We'll need to wrap whatever
+  /* Heading towards the OP's next chosen hop.  We'll need to wrap whatever
    * this thing is up in a RELAY_EARLY cell and pass it along. */
   if (cell_direction == CELL_DIRECTION_OUT) {
     log_debug(LD_OR, "Sending away from origin.");
     return loose_circuit_relay_cell_outgoing(loose_circ, layer_hint, cell);
   }
-  /* Heading towards the OP. We'll need to unwrap and decrypt all of the
-   * loose onion layers. */
-  if (cell_direction == CELL_DIRECTION_IN) {
-    log_debug(LD_OR, "Sending towards origin.");
-    return loose_circuit_relay_cell_incoming(loose_circ, layer_hint, cell);
-  }
-  return -END_CIRC_REASON_INTERNAL;
+  /* Heading towards the OP (CELL_DIRECTION_IN).  There's no other possibility
+   * here, because we asserted earlier that the direction was out or in, so we
+   * don't need to explicitly check.  We'll need to unwrap and decrypt all of
+   * the loose onion layers. */
+  log_debug(LD_OR, "Sending towards origin.");
+  return loose_circuit_relay_cell_incoming(loose_circ, layer_hint, cell);
 }
 
 /**
