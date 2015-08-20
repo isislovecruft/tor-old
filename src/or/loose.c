@@ -473,6 +473,9 @@ loose_circuit_list_path_impl(const loose_or_circuit_t *loose_circ,
 }
 
 /**
+ * Iterate through the hops in <b>loose_circ-&gt;cpath</b>, and allocate and
+ * return information about the hops.
+ *
  * If <b>verbose</b> is false, allocate and return a comma-separated
  * list of the currently built elements of <b>loose_circ</b>.  If
  * <b>verbose</b> is true, also list information about link status in
@@ -486,9 +489,10 @@ loose_circuit_list_path(const loose_or_circuit_t *loose_circ, int verbose)
   return loose_circuit_list_path_impl(loose_circ, verbose, 0);
 }
 
-/** Log, at severity <b>severity</b>, and with log <b>domain</b>, the
- * nicknames of each router in <b>loose_circ</b>'s cpath. Also log the length
- * of the cpath, and the intended exit point.
+/**
+ * Log, at severity <b>severity</b>, and with log <b>domain</b>, the nicknames
+ * and identity digests of each router in <b>loose_circ</b>'s cpath. Also log
+ * the length of the cpath.
  *
  * This is done by calling loose_circuit_list_path(), logging the returned
  * string, and then freeing it.
@@ -521,7 +525,8 @@ MOCK_IMPL(STATIC int, loose_circuit_should_use_create_fast,(void))
  *
  * Plagiarised from circuit_handle_first_hop() in circuitbuild.c.
  *
- * Return 0 for ok, -reason if <b>loose_circ</b> should be marked for close.
+ * Return 0 for success; -reason if <b>loose_circ</b> should be marked for
+ * close.
  */
 static int
 loose_circuit_handle_first_hop(loose_or_circuit_t *loose_circ)
@@ -536,7 +541,7 @@ loose_circuit_handle_first_hop(loose_or_circuit_t *loose_circ)
   tor_assert(firsthop);
   tor_assert(firsthop->extend_info);
 
-  /* Now see if we're already connected to the first injected hop. */
+  /* Now see if we're already connected to the first additional hop. */
   log_debug(LD_CIRC, "Looking for first loose-source routed hop %s...",
             safe_str(fmt_addrport(&firsthop->extend_info->addr,
                                   firsthop->extend_info->port)));
@@ -546,8 +551,7 @@ loose_circuit_handle_first_hop(loose_or_circuit_t *loose_circ)
                                   &msg,
                                   &should_launch);
 
-  /* Not currently connected in a useful way. */
-  if (!n_chan) {
+  if (!n_chan) { /* Not currently connected in a useful way. */
     log_info(LD_CIRC, "Next router is %s: %s",
              safe_str(extend_info_describe(firsthop->extend_info)),
              msg ? msg : "???");
@@ -590,11 +594,15 @@ loose_circuit_handle_first_hop(loose_or_circuit_t *loose_circ)
 }
 
 /**
- * Begin to add additional hops to a circuit, <b>or_circ</b>, (for which we
- * are acting as an OR) by sending some type of CREATE* cell to the first hop
- * we would like to add.
+ * Begin to add additional hops to a loose-source routed circuit,
+ * <b>loose_circ</b>, by sending some type of CREATE cell to our first
+ * additional hop.  Currently, we only support sending CREATE_FAST cells, in
+ * order to mimic the behaviour of OPs.
  *
- * Plagiarised from the first half of circuit_send_next_onion_skin().
+ * Based on the first half of circuit_send_next_onion_skin().
+ *
+ * Returns 0 on success, otherwise -<b>reason</b> if <b>loose_circ</b> should
+ * be marked for close.
  */
 STATIC int
 loose_circuit_send_create_cell(loose_or_circuit_t *loose_circ)
@@ -660,11 +668,15 @@ loose_circuit_send_create_cell(loose_or_circuit_t *loose_circ)
 
   circuit_set_state(circ, CIRCUIT_STATE_BUILDING);
   loose_circ->cpath->state = CPATH_STATE_AWAITING_KEYS;
+
   return 0;
 }
 
 /**
- * DOCDOC
+ * Respond to <b>cell</b>, a create cell from a client, with a created cell.
+ *
+ * If responding fails, <b>loose_circ</b> will be marked for close with the
+ * <b>reason</b> returned from command_answer_create_cell().
  */
 void
 loose_circuit_answer_create_cell(loose_or_circuit_t *loose_circ, cell_t *cell)
@@ -883,10 +895,9 @@ loose_circuit_extend(loose_or_circuit_t *loose_circ)
 
   while (hop && hop != cpath) {
     log_debug(LD_CIRC, "Deciding whether to extend loose circuit...");
-
-    /* If we don't have another hop, then we're done with doing our own
-     * EXTEND*s (to inject additional hops into this circuit).  We'll handle
-     * the OP's EXTENDS in loose_circuit_relay_cell_incoming(). */
+    /* If we don't have another hop, then we're done extending to our
+     * additional hops.  We'll handle the OP's extends in
+     * loose_circuit_relay_cell_incoming(). */
     if (hop && hop != cpath) {
       reason = loose_circuit_extend_to_next_hop(loose_circ);
       if (reason < 0) {
@@ -990,7 +1001,7 @@ loose_circuit_extend_to_next_hop(loose_or_circuit_t *loose_circ)
 }
 
 /**
- * Having received a recognized cell from our first addition hop on a loose
+ * Having received a recognized cell from our first additional hop on a loose
  * circuit, we should upwrap and decrypt the cell w.r.t. each of the
  * additional hops, and send it back along the circuit to the OP.
  *
@@ -1062,13 +1073,15 @@ loose_circuit_relay_cell_incoming(loose_or_circuit_t *loose_circ,
 }
 
 /**
- * Having received a recognized cell from the OP on a loose circuit, we should
- * wrap up and encrypt the cell to each of the additional hops, and send it
- * along to the next one.
+ * Having received a relay <b>cell</b> from the OP on a loose circuit, we
+ * should encrypt the cell to each of the additional hops, and send it along
+ * to the last additional hop (who should then send it to the OP's intended
+ * recipient).
  *
- * For instance, an OP's extend_cell would be encrypt it to the next
- * additional hop in <b>loose_circ</b>, and sent it along inside a RELAY_EARLY
- * cell.
+ * For instance, an OP's extend cell would be encrypted to the additional hops
+ * in <b>loose_circ</b>, and sent along inside a RELAY_EARLY cell to the last
+ * hop, who will perform the extend (rather than us extending directly to the
+ * next hop in the OP's chosen route).
  *
  * Returns 0 on success, and -<b>reason</b> if the circuit should be closed.
  */
@@ -1116,10 +1129,6 @@ loose_circuit_relay_cell_outgoing(loose_or_circuit_t *loose_circ,
 }
 
 /**
- * XXX Do we really need these checks?  Couldn't we just crypt the relay cell
- * as if it was not meant for us, and let whichever additional hop on our
- * loose_circ->cpath drop it because it's unrecognized?
- *
  * Returns 1 if we should continue to process the relay cell with header
  * <b>rh</b>, 0 if we should drop the cell, and -<b>reason</b> if loose_circ
  * should be marked for close.
@@ -1160,10 +1169,21 @@ loose_circuit_check_relay_cell_header(cell_t *cell)
 }
 
 /**
- * DOCDOC
+ * Process a relay <b>cell</b> that was received on <b>loose_circ</b>.
  *
- * Loosely based on pieces of circuit_package_relay_cell(), relay_crypt(),
- * circuit_receive_relay_cell(), and circuit_package_relay_cell().
+ * If this is the first relay cell seen on <b>loose_circ</b>, and we have not
+ * finished extending to our additional loose-source routed hops, then
+ * <b>cell</b> is stored as <b>loose_circ-&gt;p_chan_relay_cell</b> for
+ * processing later.
+ *
+ * Loosely (no pun intended) based on pieces of circuit_package_relay_cell(),
+ * relay_crypt(), circuit_receive_relay_cell(), and
+ * circuit_package_relay_cell(), but this stands as its own new function,
+ * since it processes the cell (almost) without regard to whether it is
+ * "recognized" or not.
+ *
+ * Returns 0 on success; otherwise -<b>reason</b> if <b>loose_circ</b> should
+ * be marked for close.
  */
 int
 loose_circuit_process_relay_cell(loose_or_circuit_t *loose_circ,
