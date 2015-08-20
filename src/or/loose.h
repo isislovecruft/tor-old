@@ -32,8 +32,8 @@ void loose_circuit_free(loose_or_circuit_t *loose_circ);
 /* Functions for handling specific cell types on a loose circuit. */
 #ifdef LOOSE_PRIVATE
 STATIC int loose_circuit_send_create_cell(loose_or_circuit_t *loose_circ);
+STATIC int loose_circuit_extend(loose_or_circuit_t *loose_circ);
 #endif
-int loose_circuit_extend(loose_or_circuit_t *loose_circ);
 int loose_circuit_process_created_cell(loose_or_circuit_t *loose_circ,
                                        created_cell_t *created_cell);
 int loose_circuit_process_relay_cell(loose_or_circuit_t *loose_circ,

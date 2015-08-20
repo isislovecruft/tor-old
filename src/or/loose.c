@@ -883,7 +883,7 @@ loose_circuit_has_opened(loose_or_circuit_t *loose_circ)
  * 
  * Returns 0 on success, and -<b>reason</b> if the circuit should be closed.
  */
-int
+STATIC int
 loose_circuit_extend(loose_or_circuit_t *loose_circ)
 {
   const crypt_path_t *cpath;
