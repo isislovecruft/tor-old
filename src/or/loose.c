@@ -596,15 +596,16 @@ loose_circuit_handle_first_hop(loose_or_circuit_t *loose_circ)
  *
  * Plagiarised from the first half of circuit_send_next_onion_skin().
  */
-int
-loose_circuit_create(loose_or_circuit_t *loose_circ)
+STATIC int
+loose_circuit_send_create_cell(loose_or_circuit_t *loose_circ)
 {
   circuit_t *circ;
   create_cell_t *cc;
   int len;
 
   if (!loose_circ || !CIRCUIT_IS_LOOSE(loose_circ)) {
-    log_warn(LD_BUG, "loose_circuit_create() wasn't called with a loose circuit!");
+    log_warn(LD_BUG, "loose_circuit_send_create_cell() wasn't called "
+                     "with a loose circuit!");
     return -END_CIRC_REASON_INTERNAL;
   }
 
@@ -1252,7 +1253,7 @@ loose_circuit_send_next_onion_skin,(loose_or_circuit_t *loose_circ))
 
   if (loose_circ->cpath->state == CPATH_STATE_CLOSED) {
     log_debug(LD_CIRC, "Doing loose_circuit_create()...");
-    reason = loose_circuit_create(loose_circ);
+    reason = loose_circuit_send_create_cell(loose_circ);
 
     if (reason < 0) {
       return reason;
