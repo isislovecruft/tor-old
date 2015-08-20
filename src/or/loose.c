@@ -1203,11 +1203,11 @@ loose_circuit_process_relay_cell(loose_or_circuit_t *loose_circ,
   if (PREDICT_UNLIKELY(!loose_circ->has_opened)) {
     /* Store the first relay_early cell for later, after our loose circuit is
      * fully constructed. */
-    log_info(LD_CIRC,
-             "Received %s command on loose circuit %d, but we haven't finished "
-             "constructing the extra hops in this circuit! Saving for later.",
-             cell_command_to_string(cell->command),
-             LOOSE_TO_CIRCUIT(loose_circ)->global_circuitlist_idx);
+    log_debug(LD_CIRC,
+              "Received %s command on loose circuit %d, but we haven't finished "
+              "constructing the extra hops in this circuit! Saving for later.",
+              cell_command_to_string(cell->command),
+              LOOSE_TO_CIRCUIT(loose_circ)->global_circuitlist_idx);
 
     ++num_seen;
     loose_circ->p_chan_relay_cell = tor_malloc_zero(sizeof(cell_t));
@@ -1216,9 +1216,9 @@ loose_circuit_process_relay_cell(loose_or_circuit_t *loose_circ,
   } else if (PREDICT_UNLIKELY(loose_circ->p_chan_relay_cell)) {
     /* If we previously stored a relay_early cell, then we should send it. */
     int raison;
+    log_debug(LD_CIRC, "Sending previously stored relay cell on loose circuit %d.",
+                       LOOSE_TO_CIRCUIT(loose_circ)->global_circuitlist_idx);
 
-    log_info(LD_CIRC, "Sending previously stored relay cell loose_circuit %d.",
-                      LOOSE_TO_CIRCUIT(loose_circ)->global_circuitlist_idx);
     raison = loose_circuit_relay_cell_outgoing(loose_circ, NULL,
                                                loose_circ->p_chan_relay_cell);
     tor_free(loose_circ->p_chan_relay_cell);
