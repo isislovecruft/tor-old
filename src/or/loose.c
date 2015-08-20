@@ -49,11 +49,9 @@ static int loose_circuit_finish_handshake(loose_or_circuit_t *loose_circ,
 static int loose_circuit_handle_first_hop(loose_or_circuit_t *loose_circ);
 static int loose_circuit_extend_to_next_hop(loose_or_circuit_t *loose_circ);
 static int loose_circuit_relay_cell_incoming(loose_or_circuit_t *loose_circ,
-                                             crypt_path_t *layer_hint,
-                                             cell_t *cell, cell_direction_t cell_direction);
+                                             crypt_path_t *layer_hint, cell_t *cell);
 static int loose_circuit_relay_cell_outgoing(loose_or_circuit_t *loose_circ,
-                                             crypt_path_t *layer_hint,
-                                             cell_t *cell, cell_direction_t cell_direction);
+                                             crypt_path_t *layer_hint, cell_t *cell);
 
 
 /**
@@ -999,8 +997,7 @@ loose_circuit_extend_to_next_hop(loose_or_circuit_t *loose_circ)
  */
 static int
 loose_circuit_relay_cell_incoming(loose_or_circuit_t *loose_circ,
-                                  crypt_path_t *layer_hint,
-                                  cell_t *cell, cell_direction_t cell_direction)
+                                  crypt_path_t *layer_hint, cell_t *cell)
 {
   channel_t *chan;        /* Where to send the cell. */
   crypt_path_t *this_hop; /* The hop we're currently decrypting from. */
@@ -1059,7 +1056,7 @@ loose_circuit_relay_cell_incoming(loose_or_circuit_t *loose_circ,
 
   ++stats_n_relay_cells_relayed;
   append_cell_to_circuit_queue(LOOSE_TO_CIRCUIT(loose_circ), chan,
-                               cell, cell_direction, rh.stream_id);
+                               cell, CELL_DIRECTION_IN, rh.stream_id);
   return 0;
 }
 
@@ -1076,8 +1073,7 @@ loose_circuit_relay_cell_incoming(loose_or_circuit_t *loose_circ,
  */
 static int
 loose_circuit_relay_cell_outgoing(loose_or_circuit_t *loose_circ,
-                                  crypt_path_t *layer_hint,
-                                  cell_t *cell, cell_direction_t cell_direction)
+                                  crypt_path_t *layer_hint, cell_t *cell)
 {
   channel_t *chan;        /* Where to send the cell. */
   crypt_path_t *this_hop; /* The hop we're currently encrypting to. */
@@ -1114,7 +1110,7 @@ loose_circuit_relay_cell_outgoing(loose_or_circuit_t *loose_circ,
 
   ++stats_n_relay_cells_relayed;
   append_cell_to_circuit_queue(LOOSE_TO_CIRCUIT(loose_circ), chan,
-                               cell, cell_direction, 0);
+                               cell, CELL_DIRECTION_OUT, 0);
   return 0;
 }
 
@@ -1202,49 +1198,45 @@ loose_circuit_process_relay_cell(loose_or_circuit_t *loose_circ,
 
     log_info(LD_CIRC, "Sending previously stored relay cell loose_circuit %d.",
                       LOOSE_TO_CIRCUIT(loose_circ)->global_circuitlist_idx);
+    raison = loose_circuit_relay_cell_outgoing(loose_circ, NULL,
+                                               loose_circ->p_chan_relay_cell);
+    tor_free(loose_circ->p_chan_relay_cell);
 
-    raison = loose_circuit_relay_cell_outgoing(loose_circ, NULL,  /* layer_hint */
-                                               loose_circ->p_chan_relay_cell,
-                                               CELL_DIRECTION_OUT);
     if (raison < 0) {
       log_debug(LD_CIRC, "Problem sending stored relay_early cell.");
       return raison;
     }
-    tor_free(loose_circ->p_chan_relay_cell);
-
     ++stats_n_relay_cells_delivered;
   }
 
   /* Otherwise process the cell we just received. */
   ++num_seen;
-  ++stats_n_relay_cells_delivered;
   log_debug(LD_OR,
             "Processing %s relay cell with command %s for loose circuit %d...",
             recognized ? "recognized" : "unrecognized",
             cell_command_to_string(cell->command),
             LOOSE_TO_CIRCUIT(loose_circ)->global_circuitlist_idx);
 
+  /* If we recognize the cell, then do some checks on the relay header. */
   if (recognized) {
     if ((reason = loose_circuit_check_relay_cell_header(cell)) < 0) {
       return reason;
     }
   }
+  ++stats_n_relay_cells_delivered;
+
   /* Heading towards the OP's next chosen hop. We'll need to wrap whatever
    * this thing is up in a RELAY_EARLY cell and pass it along. */
   if (cell_direction == CELL_DIRECTION_OUT) {
     log_debug(LD_OR, "Sending away from origin.");
-    return loose_circuit_relay_cell_outgoing(loose_circ, layer_hint,
-                                             cell, cell_direction);
+    return loose_circuit_relay_cell_outgoing(loose_circ, layer_hint, cell);
   }
   /* Heading towards the OP. We'll need to unwrap and decrypt all of the
    * loose onion layers. */
   if (cell_direction == CELL_DIRECTION_IN) {
     log_debug(LD_OR, "Sending towards origin.");
-    return loose_circuit_relay_cell_incoming(loose_circ, layer_hint,
-                                             cell, cell_direction);
+    return loose_circuit_relay_cell_incoming(loose_circ, layer_hint, cell);
   }
-  log_warn(LD_OR, "Direction for relay cell on loose circuit was neither "
-                  "in nor out? Closing.");
   return -END_CIRC_REASON_INTERNAL;
 }
 
