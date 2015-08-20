@@ -83,7 +83,7 @@ circuitmux_detach_mock(circuitmux_t *cmux, circuit_t *circ)
 /**
  * Mocked version of loose_circuit_should_use_create_fast() that pretends we
  * should use some cell type other than a CELL_CREATE_FAST in
- * loose_circuit_create().
+ * loose_circuit_send_create_cell().
  */
 static int
 mock_loose_circuit_should_use_create_fast(void)
@@ -208,7 +208,7 @@ test_loose_circuit_log_path(void *arg)
   MOCK(choose_good_entry_server, mock_choose_good_entry_server);
 
   loose_circ = loose_circuit_establish_circuit(circ_id, p_chan, entry,
-                                               0, CIRCUIT_PURPOSE_OR, 0, NULL);
+                                               0, CIRCUIT_PURPOSE_OR, 0);
   tt_assert(loose_circ);
   loose_circuit_log_path(LOG_WARN, LD_CIRC, loose_circ);
 
@@ -235,7 +235,7 @@ test_loose_circuit_establish_circuit_not_possible(void *arg)
 
   loose_circuits_are_possible = 0;
   loose_circ = loose_circuit_establish_circuit(circ_id, p_chan, entry,
-                                               0, CIRCUIT_PURPOSE_OR, 0, NULL);
+                                               0, CIRCUIT_PURPOSE_OR, 0);
   tt_assert(!loose_circ);
   tt_assert(loose_circ == NULL);
 
@@ -262,7 +262,7 @@ test_loose_circuit_establish_circuit_unattached(void *arg)
   MOCK(choose_good_entry_server, mock_choose_good_entry_server);
 
   loose_circ = loose_circuit_establish_circuit(circ_id, p_chan, entry,
-                                               0, CIRCUIT_PURPOSE_OR, 0, NULL);
+                                               0, CIRCUIT_PURPOSE_OR, 0);
   tt_assert(loose_circ);
   tt_assert(loose_circ->cpath);
   tt_assert(loose_circ->build_state);
@@ -293,7 +293,7 @@ test_loose_circuit_establish_circuit_unattached_no_entry(void *arg)
   MOCK(choose_good_entry_server, mock_choose_good_entry_server_null);
 
   loose_circ = loose_circuit_establish_circuit(circ_id, p_chan, entry,
-                                               0, CIRCUIT_PURPOSE_OR, 0, NULL);
+                                               0, CIRCUIT_PURPOSE_OR, 0);
   tt_assert(!loose_circ);
 
 done:
@@ -339,7 +339,7 @@ test_loose_circuit_establish_circuit_attached(void *arg)
 
   /* Set up the first circuit */
   loose_circ1 = loose_circuit_establish_circuit(circ_id, ch1, entry,
-                                                0, CIRCUIT_PURPOSE_OR, 0, NULL);
+                                                0, CIRCUIT_PURPOSE_OR, 0);
   tt_assert(loose_circ1);
   tt_assert(loose_circ1->cpath);
   tt_assert(loose_circ1->build_state);
@@ -351,7 +351,7 @@ test_loose_circuit_establish_circuit_attached(void *arg)
 
   /* Set up the second circuit */
   loose_circ2 = loose_circuit_establish_circuit(circ_id, ch2, entry,
-                                                0, CIRCUIT_PURPOSE_OR, 0, NULL);
+                                                0, CIRCUIT_PURPOSE_OR, 0);
   tt_assert(loose_circ2);
   tt_assert(loose_circ2->cpath);
   tt_assert(loose_circ2->build_state);
@@ -520,11 +520,11 @@ done:
 }
 
 /**
- * Calling loose_circuit_create() should construct a create_cell_t and store
- * it in the loose_circuit_t.
+ * Calling loose_circuit_send_create_cell() should construct a create_cell_t
+ * and store it in the loose_circuit_t.
  */
 static void
-test_loose_circuit_create(void *arg)
+test_loose_circuit_send_create_cell(void *arg)
 {
   loose_or_circuit_t *loose_circ;
   circid_t circ_id = 100;
@@ -540,10 +540,10 @@ test_loose_circuit_create(void *arg)
   MOCK(choose_good_entry_server, mock_choose_good_entry_server);
 
   loose_circ = loose_circuit_establish_circuit(circ_id, p_chan, entry,
-                                               0, CIRCUIT_PURPOSE_OR, 0, NULL);
+                                               0, CIRCUIT_PURPOSE_OR, 0);
   tt_assert(loose_circ);
 
-  result = loose_circuit_create(loose_circ);
+  result = loose_circuit_send_create_cell(loose_circ);
   tt_int_op(result, OP_EQ, 0); /* Should return okay. */
 
   /* The create cell should be stored in the underlying circuit_t. */
@@ -575,12 +575,13 @@ done:
 }
 
 /**
- * Calling loose_circuit_create(), when loose_circuit_should_use_create_fast()
- * tells us to use CELL_CREATE rather than CELL_CREATE_FAST, should log a
- * warning and return -END_CIRC_REASON_INTERNAL.
+ * Calling loose_circuit_send_create_cell(), when
+ * loose_circuit_should_use_create_fast() tells us to use CELL_CREATE rather
+ * than CELL_CREATE_FAST, should log a warning and return
+ * -END_CIRC_REASON_INTERNAL.
  */
 static void
-test_loose_circuit_create_no_create_fast(void *arg)
+test_loose_circuit_send_create_cell_no_create_fast(void *arg)
 {
   loose_or_circuit_t *loose_circ;
   circid_t circ_id = 100;
@@ -597,10 +598,10 @@ test_loose_circuit_create_no_create_fast(void *arg)
   MOCK(loose_circuit_should_use_create_fast, mock_loose_circuit_should_use_create_fast);
 
   loose_circ = loose_circuit_establish_circuit(circ_id, p_chan, entry,
-                                               0, CIRCUIT_PURPOSE_OR, 0, NULL);
+                                               0, CIRCUIT_PURPOSE_OR, 0);
   tt_assert(loose_circ);
 
-  result = loose_circuit_create(loose_circ);
+  result = loose_circuit_send_create_cell(loose_circ);
   tt_int_op(result, OP_EQ, -END_CIRC_REASON_INTERNAL);
 
 done:
@@ -616,18 +617,18 @@ done:
 }
 
 /**
- * Calling loose_circuit_create() with NULL should return
+ * Calling loose_circuit_send_create_cell() with NULL should return
  * -END_CIRC_REASON_INTERNAL.
  */
 static void
-test_loose_circuit_create_null(void *arg)
+test_loose_circuit_send_create_cell_null(void *arg)
 {
   loose_or_circuit_t *loose_circ = NULL;
   int result;
 
   (void)arg;
 
-  result = loose_circuit_create(loose_circ);
+  result = loose_circuit_send_create_cell(loose_circ);
   tt_int_op(result, OP_EQ, -END_CIRC_REASON_INTERNAL);
 
 done:
@@ -669,11 +670,11 @@ test_loose_circuit_process_created_cell(void *arg)
   memset(&created_cell, 0, sizeof(cell_t));
 
   loose_circ = loose_circuit_establish_circuit(circ_id, p_chan, entry,
-                                               0, CIRCUIT_PURPOSE_OR, 0, NULL);
+                                               0, CIRCUIT_PURPOSE_OR, 0);
   tt_assert(loose_circ);
 
   /* Make a create cell. */
-  tt_int_op(loose_circuit_create(loose_circ), OP_EQ, 0);
+  tt_int_op(loose_circuit_send_create_cell(loose_circ), OP_EQ, 0);
   create = LOOSE_TO_CIRCUIT(loose_circ)->n_chan_create_cell;
   tt_assert(create);
 
@@ -739,7 +740,7 @@ test_loose_circuit_process_created_cell_bad_created_cell(void *arg)
 
   memset(&created, 0, sizeof(created_cell_t));
   loose_circ = loose_circuit_establish_circuit(circ_id, p_chan, entry,
-                                               0, CIRCUIT_PURPOSE_OR, 0, NULL);
+                                               0, CIRCUIT_PURPOSE_OR, 0);
   tt_assert(loose_circ);
 
   /* The handshake should have failed this time, since there's nothing in
@@ -779,7 +780,7 @@ test_loose_circuit_has_opened(void *arg)
   MOCK(choose_good_entry_server, mock_choose_good_entry_server);
 
   loose_circ = loose_circuit_establish_circuit(circ_id, p_chan, entry,
-                                               0, CIRCUIT_PURPOSE_OR, 0, NULL);
+                                               0, CIRCUIT_PURPOSE_OR, 0);
   tt_assert(loose_circ);
   tt_int_op(loose_have_completed_a_circuit(), OP_EQ, 0);
 
@@ -819,7 +820,7 @@ test_loose_circuit_extend_no_cpath_next(void *arg)
   MOCK(choose_good_entry_server, mock_choose_good_entry_server);
 
   loose_circ = loose_circuit_establish_circuit(circ_id, p_chan, entry,
-                                               0, CIRCUIT_PURPOSE_OR, 0, NULL);
+                                               0, CIRCUIT_PURPOSE_OR, 0);
   tt_assert(loose_circ);
 
   result = loose_circuit_extend(loose_circ);
@@ -851,9 +852,9 @@ struct testcase_t loose_tests[] = {
   TEST_LOOSE(circuit_pick_cpath_entry, TT_FORK),
   TEST_LOOSE(circuit_pick_cpath_entry_null, TT_FORK),
   TEST_LOOSE(circuit_pick_cpath_entry_chosen, TT_FORK),
-  TEST_LOOSE(circuit_create, TT_FORK),
-  TEST_LOOSE(circuit_create_no_create_fast, TT_FORK),
-  TEST_LOOSE(circuit_create_null, TT_FORK),
+  TEST_LOOSE(circuit_send_create_cell, TT_FORK),
+  TEST_LOOSE(circuit_send_create_cell_no_create_fast, TT_FORK),
+  TEST_LOOSE(circuit_send_create_cell_null, TT_FORK),
   TEST_LOOSE(circuit_process_created_cell, TT_FORK),
   TEST_LOOSE(circuit_process_created_cell_bad_created_cell, TT_FORK),
   TEST_LOOSE(circuit_has_opened, TT_FORK),
