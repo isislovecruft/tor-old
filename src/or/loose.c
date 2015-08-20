@@ -1215,17 +1215,15 @@ loose_circuit_process_relay_cell(loose_or_circuit_t *loose_circ,
     return 0;
   } else if (PREDICT_UNLIKELY(loose_circ->p_chan_relay_cell)) {
     /* If we previously stored a relay_early cell, then we should send it. */
-    int raison;
     log_debug(LD_CIRC, "Sending previously stored relay cell on loose circuit %d.",
                        LOOSE_TO_CIRCUIT(loose_circ)->global_circuitlist_idx);
 
-    raison = loose_circuit_relay_cell_outgoing(loose_circ, NULL,
+    reason = loose_circuit_relay_cell_outgoing(loose_circ, NULL,
                                                loose_circ->p_chan_relay_cell);
     tor_free(loose_circ->p_chan_relay_cell);
-
-    if (raison < 0) {
+    if (reason < 0) {
       log_debug(LD_CIRC, "Problem sending stored relay_early cell.");
-      return raison;
+      return reason;
     }
     ++stats_n_relay_cells_delivered;
   }
