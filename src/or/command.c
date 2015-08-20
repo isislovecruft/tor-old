@@ -368,16 +368,6 @@ command_process_create_cell(cell_t *cell, channel_t *chan)
    */
   if (bridge_server_mode(options) && channel_is_incoming(chan) &&
       loose_circuits_are_possible) {
-    circuit_t *circ;
-
-    circ = circuit_get_by_circid_channel(cell->circ_id, chan);
-    if (circ) {
-      log_debug(LD_CIRC,
-                "Got a create cell for loose_circ %d, which already exists!",
-                circ->global_circuitlist_idx);
-      return;
-    }
-
     loose_circ = loose_circuit_establish_circuit(cell->circ_id, chan, NULL,
                                                  0, CIRCUIT_PURPOSE_OR, 0);
     if (!loose_circ) {
