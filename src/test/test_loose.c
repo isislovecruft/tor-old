@@ -1326,7 +1326,9 @@ test_loose_circuit_send_create_cell_null(void *arg)
 }
 
 /**
- * Calling loos_circuit_finish_handshake() should DOCDOC
+ * Calling loos_circuit_finish_handshake() when the cpath is in state
+ * CPATH_STATE_CLOSED should result in a handshake failure.  After the state
+ * changes to CPATH_STATE_AWAITING_KEYS, the handshake should succeed.
  */
 static void
 test_loose_circuit_finish_handshake(void *arg)
@@ -1582,7 +1584,10 @@ test_loose_circuit_extend_no_cpath_next(void *arg)
 
 /**
  * Calling loose_circuit_extend() when the cpath hasn't been completely
- * extended to should just call loose_circuit_extend_to_next_hop() and DOCDOC
+ * extended to should call loose_circuit_extend_to_next_hop() as many times as
+ * is necessary before returning success.  If called a second time, it should
+ * detect that the circuit is already completely constructed, and return
+ * success.
  */
 static void
 test_loose_circuit_extend_multihop(void *arg)
