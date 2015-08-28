@@ -64,6 +64,7 @@ STATIC void loose_circuit_has_opened(loose_or_circuit_t *loose_circ);
 
 /* Functions for handling specific cell types on a loose circuit. */
 #ifdef LOOSE_PRIVATE
+STATIC int loose_circuit_handle_first_hop(loose_or_circuit_t *loose_circ);
 STATIC int loose_circuit_finish_handshake(loose_or_circuit_t *loose_circ,
                                           const created_cell_t *reply);
 STATIC int loose_circuit_send_create_cell(loose_or_circuit_t *loose_circ);

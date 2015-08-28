@@ -208,7 +208,7 @@ circuit_receive_relay_cell(cell_t *cell, circuit_t *circ,
                                                     cell, cell_direction,
                                                     recognized);
     if (error_reason < 0) {
-      log_warn(LD_OR, "loose_circuit_handle_cell() failed.");
+      log_warn(LD_OR, "loose_circuit_process_relay_cell() failed.");
       return error_reason;
     }
     return 0;

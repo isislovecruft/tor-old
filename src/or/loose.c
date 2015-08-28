@@ -39,7 +39,6 @@ static char* loose_circuit_list_path_impl(const loose_or_circuit_t *loose_circ,
                                           int verbose, int verbose_names);
 
 /** Functions for handling specific cells on a loose-source routed circuit. */
-static int loose_circuit_handle_first_hop(loose_or_circuit_t *loose_circ);
 static int loose_circuit_relay_cell_incoming(loose_or_circuit_t *loose_circ,
                                              crypt_path_t *layer_hint,
                                              cell_t *cell);
@@ -522,7 +521,7 @@ MOCK_IMPL(STATIC int, loose_circuit_should_use_create_fast,(void))
  * Return 0 for success; -reason if <b>loose_circ</b> should be marked for
  * close.
  */
-static int
+STATIC int
 loose_circuit_handle_first_hop(loose_or_circuit_t *loose_circ)
 {
   crypt_path_t *firsthop;
@@ -731,7 +730,7 @@ loose_circuit_finish_handshake(loose_or_circuit_t *loose_circ,
     hop = loose_circ->cpath;
   } else {
     hop = onion_next_hop_in_cpath(loose_circ->cpath);
-    if (!hop) {     /* We got an EXTENDED when we're all done? */
+    if (!hop) { /* We got an EXTENDED when we're all done? */
       log_warn(LD_PROTOCOL, "We got an extended when loose-source routed "
                             "circuit was already built? Closing.");
       return -END_CIRC_REASON_TORPROTOCOL;
@@ -1193,7 +1192,6 @@ loose_circuit_process_relay_cell(loose_or_circuit_t *loose_circ,
   static uint64_t num_seen = 0; /** The number of relay cells we've seen. */
   int reason = 0;
 
-  tor_assert(cell);
   tor_assert(loose_circ);
   tor_assert(CIRCUIT_IS_LOOSE(loose_circ));
   tor_assert(cell_direction == CELL_DIRECTION_IN ||
@@ -1202,6 +1200,8 @@ loose_circuit_process_relay_cell(loose_or_circuit_t *loose_circ,
   if (PREDICT_UNLIKELY(!loose_circ->has_opened)) {
     /* Store the first relay_early cell for later, after our loose circuit is
      * fully constructed. */
+    tor_assert(cell);
+
     if (cell_direction == CELL_DIRECTION_OUT) {
       log_debug(LD_CIRC,
                 "Received %s command on loose circuit %d, but we haven't "
@@ -1250,6 +1250,10 @@ loose_circuit_process_relay_cell(loose_or_circuit_t *loose_circ,
       return reason;
     }
     ++stats_n_relay_cells_delivered;
+  }
+
+  if (!cell) { /* We must have been called from loose_circuit_has_opened() */
+    return 0;  /* to process the stored relay_early cell. */
   }
 
   /* Otherwise process the cell we just received. */
