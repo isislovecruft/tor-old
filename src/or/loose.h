@@ -27,7 +27,6 @@ STATIC loose_or_circuit_t* loose_or_circuit_init(circid_t circ_id,
                                                  channel_t *p_chan,
                                                  uint8_t purpose,
                                                  int flags);
-MOCK_DECL(STATIC int, loose_circuit_should_use_create_fast,(void));
 #endif
 loose_or_circuit_t* loose_circuit_establish_circuit(circid_t circ_id,
                                                     channel_t *p_chan,

@@ -478,17 +478,6 @@ loose_circuit_log_path(int severity, unsigned int domain,
 }
 
 /**
- * Returns true if we should use CREATE_FAST cells to establish a connection
- * to the first additional hop in a loose-source routed circuit.
- *
- * Returns true always.
- */
-MOCK_IMPL(STATIC int, loose_circuit_should_use_create_fast,(void))
-{
-  return 1;
-}
-
-/**
  * Start establishing the first injected hop of our loose-source routed
  * circuit.  Figure out what OR we should connect to, and if necessary start
  * the connection to it.  If we're already connected, then send the CREATE
@@ -583,7 +572,7 @@ loose_circuit_make_create_cell(loose_or_circuit_t *loose_circ)
 {
   circuit_t *circ;
   create_cell_t *cc;
-  int len;
+  int len, fast;
 
   tor_assert(loose_circ);
   tor_assert(CIRCUIT_IS_LOOSE(loose_circ));
@@ -594,14 +583,15 @@ loose_circuit_make_create_cell(loose_or_circuit_t *loose_circ)
   /* Allocate memory for a create cell and start making it. */
   cc = tor_malloc_zero(sizeof(create_cell_t));
 
-  if (PREDICT_LIKELY(loose_circuit_should_use_create_fast())) {
+  fast = should_use_create_fast_for_circuit_cpath(loose_circ->cpath);
+  if (!fast) {
+    circuit_pick_create_handshake(&cc->cell_type, &cc->handshake_type,
+                                  loose_circ->cpath->extend_info);
+    note_request("cell: create", 1);
+  } else {
     cc->cell_type = CELL_CREATE_FAST;
     cc->handshake_type = ONION_HANDSHAKE_TYPE_FAST;
     note_request("cell: create fast", 1);
-  } else {
-    log_warn(LD_CIRC, "Don't know how to use a CREATE or CREATE2 cell to "
-                      "establish a circuit to our first additional hop.");
-    return -END_CIRC_REASON_INTERNAL;
   }
 
   log_debug(LD_CIRC,

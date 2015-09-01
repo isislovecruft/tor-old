@@ -834,7 +834,7 @@ circuits_can_use_ntor(void)
 /** Decide whether to use a TAP or ntor handshake for connecting to <b>ei</b>
  * directly, and set *<b>cell_type_out</b> and *<b>handshake_type_out</b>
  * accordingly. */
-static void
+void
 circuit_pick_create_handshake(uint8_t *cell_type_out,
                               uint16_t *handshake_type_out,
                               const extend_info_t *ei)

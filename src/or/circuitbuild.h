@@ -37,6 +37,9 @@ int should_use_create_fast_for_circuit_cpath(const crypt_path_t *cpath);
 int circuit_timeout_want_to_count_circ(origin_circuit_t *circ);
 int cpath_supports_ntor(crypt_path_t *const cpath_orig);
 int circuits_can_use_ntor(void);
+void circuit_pick_create_handshake(uint8_t *cell_type_out,
+                                   uint16_t *handshake_type_out,
+                                   const extend_info_t *ei);
 void circuit_pick_extend_handshake(uint8_t *cell_type_out,
                                    uint8_t *create_cell_type_out,
                                    uint16_t *handshake_type_out,
