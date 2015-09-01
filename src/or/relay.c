@@ -593,7 +593,7 @@ relay_send_command_from_edge_(streamid_t stream_id, circuit_t *circ,
   if (cpath_layer) {
     cell.circ_id = circ->n_circ_id;
     cell_direction = CELL_DIRECTION_OUT;
-  } else if (! CIRCUIT_IS_ORIGIN(circ)) {
+  } else if (CIRCUIT_IS_ORIGIN(circ) || CIRCUIT_IS_LOOSE(circ)) {
     cell.circ_id = TO_OR_CIRCUIT(circ)->p_circ_id;
     cell_direction = CELL_DIRECTION_IN;
   } else {
@@ -657,6 +657,21 @@ relay_send_command_from_edge_(streamid_t stream_id, circuit_t *circ,
                "Commands sent before: %s", commands);
       tor_free(commands);
       smartlist_free(commands_list);
+    }
+  }
+
+  if (cell_direction == CELL_DIRECTION_OUT && CIRCUIT_IS_LOOSE(circ)) {
+    loose_or_circuit_t *loose_circ = TO_LOOSE_CIRCUIT(circ);
+    /* If we've got any relay_early cells left and we're sending an extend
+     * cell (or we're not talking to the first hop), use one of them. */
+    if (LOOSE_TO_OR_CIRCUIT(loose_circ)->remaining_relay_early_cells > 0 &&
+        (relay_command == RELAY_COMMAND_EXTEND ||
+         relay_command == RELAY_COMMAND_EXTEND2 ||
+         cpath_layer != loose_circ->cpath)) {
+      cell.command = CELL_RELAY_EARLY;
+      --LOOSE_TO_OR_CIRCUIT(loose_circ)->remaining_relay_early_cells;
+      log_debug(LD_OR, "Sending a RELAY_EARLY cell; %d remaining.",
+                LOOSE_TO_OR_CIRCUIT(loose_circ)->remaining_relay_early_cells);
     }
   }
 
