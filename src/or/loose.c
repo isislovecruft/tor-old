@@ -35,8 +35,6 @@ static loose_or_circuit_t* loose_or_circuit_new(circid_t circ_id,
 static int loose_count_acceptable_nodes(void);
 static char* loose_circuit_list_path(const loose_or_circuit_t *loose_circ,
                                      int verbose);
-static char* loose_circuit_list_path_impl(const loose_or_circuit_t *loose_circ,
-                                          int verbose, int verbose_names);
 
 /** Functions for handling specific cells on a loose-source routed circuit. */
 static int loose_circuit_relay_cell_incoming(loose_or_circuit_t *loose_circ,
@@ -435,8 +433,7 @@ loose_circuit_free(loose_or_circuit_t *loose_circ)
  * Returns a string describing the hops in <b>loose_circ-&gt;cpath</b>.
  */
 static char *
-loose_circuit_list_path_impl(const loose_or_circuit_t *loose_circ,
-                             int verbose, int verbose_names)
+loose_circuit_list_path(const loose_or_circuit_t *loose_circ, int verbose)
 {
   smartlist_t *elements;
   char *s;
@@ -461,23 +458,6 @@ loose_circuit_list_path_impl(const loose_or_circuit_t *loose_circ,
   SMARTLIST_FOREACH(elements, char*, cp, tor_free(cp));
   smartlist_free(elements);
   return s;
-}
-
-/**
- * Iterate through the hops in <b>loose_circ-&gt;cpath</b>, and allocate and
- * return information about the hops.
- *
- * If <b>verbose</b> is false, allocate and return a comma-separated
- * list of the currently built elements of <b>loose_circ</b>.  If
- * <b>verbose</b> is true, also list information about link status in
- * a more verbose format using spaces.
- *
- * The returned string will need to be freed by the caller.
- */
-static char *
-loose_circuit_list_path(const loose_or_circuit_t *loose_circ, int verbose)
-{
-  return loose_circuit_list_path_impl(loose_circ, verbose, 0);
 }
 
 /**
