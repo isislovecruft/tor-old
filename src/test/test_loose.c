@@ -3,7 +3,8 @@
  * Copyright (c) 2015, The Tor Project, Inc. */
 /* See LICENSE for licensing information */
 
-#define TOR_CHANNEL_INTERNAL_
+#define TOR_CHANNEL_INTERNAL_   /* Needed for channel_init() */
+#define CIRCUITLIST_PRIVATE     /* Needed for circuit_free() */
 #define LOOSE_PRIVATE
 
 #include "or.h"
@@ -81,17 +82,6 @@ circuitmux_detach_mock(circuitmux_t *cmux, circuit_t *circ)
 /*****************************************************************************
  *                           MOCKED FUNCTIONS
  *****************************************************************************/
-
-/**
- * Mocked version of loose_circuit_should_use_create_fast() that pretends we
- * should use some cell type other than a CELL_CREATE_FAST in
- * loose_circuit_send_create_cell().
- */
-static int
-mock_loose_circuit_should_use_create_fast(void)
-{
-  return 0;
-}
 
 /**
  * Mocked version of loose_circuit_send_next_onion_skin() which does nothing
@@ -1292,56 +1282,11 @@ test_loose_circuit_send_create_cell(void *arg)
 }
 
 /**
- * Calling loose_circuit_send_create_cell(), when
- * loose_circuit_should_use_create_fast() tells us to use CELL_CREATE rather
- * than CELL_CREATE_FAST, should log a warning and return
- * -END_CIRC_REASON_INTERNAL.
- */
-static void
-test_loose_circuit_send_create_cell_no_create_fast(void *arg)
-{
-  loose_or_circuit_t *loose_circ;
-  circid_t circ_id = 100;
-  channel_t *p_chan = new_fake_channel();
-  extend_info_t *entry = NULL;
-  int result;
-
-  (void)arg;
-
-  loose_circuits_are_possible = 1;
-  MOCK(circuitmux_attach_circuit, circuitmux_attach_mock);
-  MOCK(circuitmux_detach_circuit, circuitmux_detach_mock);
-  MOCK(choose_good_entry_server, mock_choose_good_entry_server);
-  MOCK(channel_get_for_extend, mock_channel_get_for_extend_success);
-  MOCK(circuit_deliver_create_cell, mock_circuit_deliver_create_cell_success);
-
-  loose_circ = loose_circuit_establish_circuit(circ_id, p_chan, entry,
-                                               0, CIRCUIT_PURPOSE_OR, 0);
-  tt_assert(loose_circ);
-
-  MOCK(loose_circuit_should_use_create_fast,
-       mock_loose_circuit_should_use_create_fast);
-  result = loose_circuit_send_create_cell(loose_circ);
-  tt_int_op(result, OP_EQ, -END_CIRC_REASON_INTERNAL);
-
- done:
-  if (loose_circ)
-    circuit_free(LOOSE_TO_CIRCUIT(loose_circ));
-  if (p_chan)
-    tor_free(p_chan->cmux);
-  tor_free(p_chan);
-  UNMOCK(circuitmux_attach_circuit);
-  UNMOCK(circuitmux_detach_circuit);
-  UNMOCK(choose_good_entry_server);
-  UNMOCK(channel_get_for_extend);
-  UNMOCK(circuit_deliver_create_cell);
-  UNMOCK(loose_circuit_should_use_create_fast);
-}
-
-/**
  * Calling loose_circuit_finish_handshake() when the cpath is in state
  * CPATH_STATE_CLOSED should result in a handshake failure.  After the state
- * changes to CPATH_STATE_AWAITING_KEYS, the handshake should succeed.
+ * changes to CPATH_STATE_AWAITING_KEYS, the handshake should succeed.  If
+ * called after all the hops in the cpath are in CPATH_STATE_OPEN, then
+ * loose_circuit_finish_handshake() should return -END_CIRC_REASON_TORPROTOCOL.
  */
 static void
 test_loose_circuit_finish_handshake(void *arg)
@@ -1387,6 +1332,12 @@ test_loose_circuit_finish_handshake(void *arg)
   loose_circ->cpath->state = CPATH_STATE_AWAITING_KEYS;
   result = loose_circuit_finish_handshake(loose_circ, &created);
   tt_int_op(result, OP_EQ, 0);
+
+  /* Set all hops to CPATH_STATE_OPEN.  The next handshake should fail. */
+  loose_circ->cpath->state = CPATH_STATE_OPEN;
+  loose_circ->cpath->next->state = CPATH_STATE_OPEN;
+  result = loose_circuit_finish_handshake(loose_circ, &created);
+  tt_int_op(result, OP_EQ, -END_CIRC_REASON_TORPROTOCOL);
 
  done:
   if (loose_circ)
@@ -1978,7 +1929,6 @@ struct testcase_t loose_tests[] = {
   TEST_LOOSE(circuit_handle_first_hop, TT_FORK),
   TEST_LOOSE(circuit_answer_create_cell, TT_FORK),
   TEST_LOOSE(circuit_send_create_cell, TT_FORK),
-  TEST_LOOSE(circuit_send_create_cell_no_create_fast, TT_FORK),
   TEST_LOOSE(circuit_finish_handshake, TT_FORK),
   TEST_LOOSE(circuit_process_created_cell, TT_FORK),
   TEST_LOOSE(circuit_process_created_cell_bad_created_cell, TT_FORK),
