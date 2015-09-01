@@ -28,6 +28,7 @@
 #include "relay.h"
 #include "router.h"
 
+/** Functions for creating loose circuits. */
 static loose_or_circuit_t* loose_or_circuit_new(circid_t circ_id,
                                                 channel_t *p_chan);
 
@@ -55,7 +56,7 @@ static char loose_can_complete_circuits = 0;
  * Return 1 if we have successfully built a loose circuit, and nothing has
  * changed to make us think that maybe we can't.
  */
-char
+STATIC char
 loose_have_completed_a_circuit(void)
 {
   return loose_can_complete_circuits;
@@ -64,7 +65,7 @@ loose_have_completed_a_circuit(void)
 /**
  * Note that we have successfully built a loose circuit.
  */
-void
+STATIC void
 loose_note_that_we_completed_a_circuit(void)
 {
   loose_can_complete_circuits = 1;
@@ -74,7 +75,7 @@ loose_note_that_we_completed_a_circuit(void)
  * Note that something has happened (like a clock jump, or DisableNetwork) to
  * make us think that maybe we can't complete loose circuits.
  */
-void
+STATIC void
 loose_note_that_we_maybe_cant_complete_circuits(void)
 {
   loose_can_complete_circuits = 0;
@@ -813,7 +814,7 @@ loose_count_acceptable_nodes(void)
   int num = 0;
 
   SMARTLIST_FOREACH(nodelist_get_list(), const node_t *, node, {
-    /* Don't count nodes which either aren't running. */
+    /* Don't count nodes which aren't running. */
     if (!node->is_running)
       continue;
     /* If the node is invalid, check if our AllowInvalidRouters settings would

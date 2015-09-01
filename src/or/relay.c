@@ -565,8 +565,6 @@ relay_command_to_string(uint8_t command)
   }
 }
 
-//XXX prop#188
-
 /** Make a relay cell out of <b>relay_command</b> and <b>payload</b>, and send
  * it onto the open circuit <b>circ</b>. <b>stream_id</b> is the ID on
  * <b>circ</b> for the stream that's sending the relay cell, or 0 if it's a

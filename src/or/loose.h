@@ -16,10 +16,13 @@
 
 extern char loose_circuits_are_possible;
 
-/** Functions for storing state on whether we can create loose circuits. */
-char loose_have_completed_a_circuit(void);
-void loose_note_that_we_completed_a_circuit(void);
-void loose_note_that_we_maybe_cant_complete_circuits(void);
+/** Functions and variables for storing state on whether or not we believe we
+ * can create loose circuits. */
+#ifdef LOOSE_PRIVATE
+STATIC char loose_have_completed_a_circuit(void);
+STATIC void loose_note_that_we_completed_a_circuit(void);
+STATIC void loose_note_that_we_maybe_cant_complete_circuits(void);
+#endif
 
 /** Functions for creating loose circuits. */
 #ifdef LOOSE_PRIVATE
