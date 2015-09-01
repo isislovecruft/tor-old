@@ -33,6 +33,7 @@ circuit_deliver_create_cell,(circuit_t *circ,
                              const struct create_cell_t *create_cell,
                              int relayed));
 int inform_testing_reachability(void);
+int should_use_create_fast_for_circuit_cpath(const crypt_path_t *cpath);
 int circuit_timeout_want_to_count_circ(origin_circuit_t *circ);
 int cpath_supports_ntor(crypt_path_t *const cpath_orig);
 int circuits_can_use_ntor(void);

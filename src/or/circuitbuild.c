@@ -784,26 +784,20 @@ inform_testing_reachability(void)
 
 /** Return true iff we should send a create_fast cell to start building a given
  * circuit */
-static INLINE int
-should_use_create_fast_for_circuit(origin_circuit_t *circ)
+int
+should_use_create_fast_for_circuit_cpath(const crypt_path_t *cpath)
 {
   const or_options_t *options = get_options();
-  tor_assert(circ->cpath);
-  tor_assert(circ->cpath->extend_info);
+  tor_assert(cpath);
+  tor_assert(cpath->extend_info);
 
-  if (!circ->cpath->extend_info->onion_key)
+  if (!cpath->extend_info->onion_key)
     return 1; /* our hand is forced: only a create_fast will work. */
-  if (public_server_mode(options)) {
+  if (server_mode(options)) {
     /* We're a server, and we know an onion key. We can choose.
      * Prefer to blend our circuit into the other circuits we are
      * creating on behalf of others. */
     return 0;
-  } else if (bridge_server_mode(options)) {
-    /* We're a bridge, and we know an onion key. However, in order to
-     * appear to be a normal client, we should use CREATE_FAST.
-     * See prop#188.
-     */
-    return 1;
   }
   if (options->FastFirstHopPK == -1) {
     /* option is "auto", so look at the consensus. */
@@ -917,7 +911,7 @@ circuit_send_next_onion_skin(origin_circuit_t *circ)
       control_event_bootstrap(BOOTSTRAP_STATUS_CIRCUIT_CREATE, 0);
 
     node = node_get_by_id(circ->base_.n_chan->identity_digest);
-    fast = should_use_create_fast_for_circuit(circ);
+    fast = should_use_create_fast_for_circuit_cpath(circ->cpath);
     if (!fast) {
       /* We are an OR and we know the right onion key: we should
        * send a create cell.
