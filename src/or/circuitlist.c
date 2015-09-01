@@ -739,7 +739,7 @@ or_circuit_new(circid_t p_circ_id, channel_t *p_chan)
 
 /** Deallocate space associated with circ.
  */
-void
+STATIC void
 circuit_free(circuit_t *circ)
 {
   void *mem;
@@ -785,15 +785,16 @@ circuit_free(circuit_t *circ)
       tor_assert(circ->magic == LOOSE_OR_CIRCUIT_MAGIC);
       loose_circuit_free(TO_LOOSE_CIRCUIT(circ));
     } else {
-      /* Remember cell statistics for this circuit before deallocating. */
-      if (get_options()->CellStatistics)
-        rep_hist_buffer_stats_add_circ(circ, time(NULL));
       mem = ocirc;
       memlen = sizeof(or_circuit_t);
       tor_assert(circ->magic == OR_CIRCUIT_MAGIC);
-
-      should_free = (ocirc->workqueue_entry == NULL);
     }
+    should_free = (ocirc->workqueue_entry == NULL);
+
+    /* Remember cell statistics for this circuit before deallocating. */
+    if (get_options()->CellStatistics)
+      rep_hist_buffer_stats_add_circ(circ, time(NULL));
+
     crypto_cipher_free(ocirc->p_crypto);
     crypto_digest_free(ocirc->p_digest);
     crypto_cipher_free(ocirc->n_crypto);
