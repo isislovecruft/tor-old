@@ -587,33 +587,31 @@ loose_circuit_handle_first_hop(loose_or_circuit_t *loose_circ)
 }
 
 /**
- * Begin to add additional hops to a loose-source routed circuit,
- * <b>loose_circ</b>, by sending some type of CREATE cell to our first
- * additional hop.  Currently, we only support sending CREATE_FAST cells, in
- * order to mimic the behaviour of OPs.
+ * Allocate and format a create cell for the first additional hop in
+ * <b>loose_circ</b>.
  *
- * Based on the first half of circuit_send_next_onion_skin().
+ * Currently, the only type of create cell supported by loose-source routed
+ * circuits is CREATE_FAST, in order to mimic OP behaviour.
+ *
+ * The create cell, <b>cc</b>, will be freed when either circuit_n_chan_done()
+ * or loose_circuit_send_create_cell() is called, since one of those functions
+ * will handle queueing the cell.
  *
  * Returns 0 on success, otherwise -<b>reason</b> if <b>loose_circ</b> should
  * be marked for close.
  */
 STATIC int
-loose_circuit_send_create_cell(loose_or_circuit_t *loose_circ)
+loose_circuit_make_create_cell(loose_or_circuit_t *loose_circ)
 {
   circuit_t *circ;
   create_cell_t *cc;
   int len;
 
-  if (!loose_circ || !CIRCUIT_IS_LOOSE(loose_circ)) {
-    log_warn(LD_BUG, "loose_circuit_send_create_cell() wasn't called "
-                     "with a loose circuit!");
-    return -END_CIRC_REASON_INTERNAL;
-  }
+  tor_assert(loose_circ);
+  tor_assert(CIRCUIT_IS_LOOSE(loose_circ));
+  tor_assert(! LOOSE_TO_CIRCUIT(loose_circ)->n_chan_create_cell);
 
   circ = LOOSE_TO_CIRCUIT(loose_circ);
-
-  /* Make sure we haven't already stored a create cell. */
-  tor_assert(!circ->n_chan_create_cell);
 
   /* Allocate memory for a create cell and start making it. */
   cc = tor_malloc_zero(sizeof(create_cell_t));
@@ -642,15 +640,41 @@ loose_circuit_send_create_cell(loose_or_circuit_t *loose_circ)
     return -END_CIRC_REASON_INTERNAL;
   }
   cc->handshake_len = len;
-
-  /* For the following to have effect, the circuit should be in
-   * CIRCUIT_STATE_CHAN_WAIT (in order to get circuit_n_chan_done() to call
-   * circuit_deliver_create_cell() with the stored create cell for us. */
+  /* If the circuit is in state CIRCUIT_STATE_CHAN_WAIT, then when
+   * circuit_n_chan_done() is called, it will send the stored create
+   * call for us by calling circuit_deliver_create_cell(). */
   circ->n_chan_create_cell = cc;
-  circuit_set_state(circ, CIRCUIT_STATE_CHAN_WAIT);
+  return 0;
+}
+
+/**
+ * Begin to add additional hops to a loose-source routed circuit,
+ * <b>loose_circ</b>, by sending some type of CREATE cell to our first
+ * additional hop.  Currently, we only support sending CREATE_FAST cells, in
+ * order to mimic the behaviour of OPs.
+ *
+ * Based on the first half of circuit_send_next_onion_skin().
+ *
+ * Returns 0 on success, otherwise -<b>reason</b> if <b>loose_circ</b> should
+ * be marked for close.
+ */
+STATIC int
+loose_circuit_send_create_cell(loose_or_circuit_t *loose_circ)
+{
+  circuit_t *circ;
+  int reason;
+
+  tor_assert(loose_circ);
+  tor_assert(CIRCUIT_IS_LOOSE(loose_circ));
+
+  circ = LOOSE_TO_CIRCUIT(loose_circ);
+
+  if (!(LOOSE_TO_CIRCUIT(loose_circ)->n_chan_create_cell))
+    if ((reason = loose_circuit_make_create_cell(loose_circ)) < 0)
+      return reason;
 
   log_debug(LD_CIRC, "Sending %s cell to %s for loose circuit %d.",
-            cell_command_to_string(cc->cell_type),
+            cell_command_to_string(circ->n_chan_create_cell->cell_type),
             safe_str(extend_info_describe(loose_circ->cpath->extend_info)),
             circ->global_circuitlist_idx);
 
@@ -658,7 +682,6 @@ loose_circuit_send_create_cell(loose_or_circuit_t *loose_circ)
     return -END_CIRC_REASON_RESOURCELIMIT;
   }
   tor_free(circ->n_chan_create_cell);
-
   circuit_set_state(circ, CIRCUIT_STATE_BUILDING);
   loose_circ->cpath->state = CPATH_STATE_AWAITING_KEYS;
 
@@ -1295,6 +1318,9 @@ MOCK_IMPL(int,
 loose_circuit_send_next_onion_skin,(loose_or_circuit_t *loose_circ))
 {
   int reason = 0;
+
+  log_debug(LD_CIRC, "Sending next onionskin for loose circuit %d",
+            LOOSE_TO_CIRCUIT(loose_circ)->global_circuitlist_idx);
 
   if (loose_circ->cpath->state == CPATH_STATE_CLOSED) {
     reason = loose_circuit_send_create_cell(loose_circ);

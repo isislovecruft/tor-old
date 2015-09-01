@@ -657,12 +657,18 @@ circuit_n_chan_done(channel_t *chan, int status, int close_origin_circuits)
           /* XXX could this be bad, eg if next_onion_skin failed because conn
            *     died? */
         }
+      } else if (CIRCUIT_IS_LOOSE(circ)) {
+        loose_or_circuit_t *loose_circ = TO_LOOSE_CIRCUIT(circ);
+
+        if ((err_reason = loose_circuit_send_next_onion_skin(loose_circ)) < 0) {
+          log_info(LD_CIRC, "loose_circuit_send_next_onion_skin failed.");
+          circuit_mark_for_close(circ, -err_reason);
+          continue;
+        }
       } else {
-        /* Pull the create cell out of circ->n_chan_create_cell, and send it.
-         * If this is a loose circuit, then set relayed to false. */
+        /* pull the create cell out of circ->n_chan_create_cell, and send it */
         tor_assert(circ->n_chan_create_cell);
-        if (circuit_deliver_create_cell(circ, circ->n_chan_create_cell,
-                                        CIRCUIT_IS_LOOSE(circ) ? 0 : 1) < 0) {
+        if (circuit_deliver_create_cell(circ, circ->n_chan_create_cell, 1)<0) {
           circuit_mark_for_close(circ, END_CIRC_REASON_RESOURCELIMIT);
           continue;
         }
