@@ -194,24 +194,17 @@ circuit_receive_relay_cell(cell_t *cell, circuit_t *circ,
   if (circ->marked_for_close)
     return 0;
 
-  if (relay_crypt(circ, cell, cell_direction, &layer_hint, &recognized) < 0) {
-    log_warn(LD_BUG,"relay crypt failed. Dropping connection.");
-    return -END_CIRC_REASON_INTERNAL;
-  }
-
   /* For loose circuits, we treat all cells as recognized. */
   if (CIRCUIT_IS_LOOSE(circ)) {
     loose_or_circuit_t *loose_circ = TO_LOOSE_CIRCUIT(circ);
-    int error_reason;
 
-    error_reason = loose_circuit_process_relay_cell(loose_circ, layer_hint,
-                                                    cell, cell_direction,
-                                                    recognized);
-    if (error_reason < 0) {
-      log_warn(LD_OR, "loose_circuit_process_relay_cell() failed.");
-      return error_reason;
-    }
-    return 0;
+    return loose_circuit_process_relay_cell(loose_circ, layer_hint, cell,
+                                            cell_direction, recognized);
+  }
+
+  if (relay_crypt(circ, cell, cell_direction, &layer_hint, &recognized) < 0) {
+    log_warn(LD_BUG,"relay crypt failed. Dropping connection.");
+    return -END_CIRC_REASON_INTERNAL;
   }
 
   if (recognized) {

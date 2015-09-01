@@ -196,7 +196,7 @@ loose_circuit_establish_circuit(circid_t circ_id, channel_t *p_chan,
   log_debug(LD_CIRC, "Establishing loose circuit...");
 
   /* Determine the appropriate path length and store it in the state. */
-  length = (len > 0) ? len : DEFAULT_LOOSE_ROUTE_LEN; // XXX cap to maximum?
+  length = (len > 0) ? len : DEFAULT_LOOSE_ROUTE_LEN;
   loose_circ->build_state->desired_path_len = length;
 
   entry = loose_circuit_pick_cpath_entry(loose_circ, entry);
@@ -259,6 +259,9 @@ loose_circuit_pick_cpath_entry(loose_or_circuit_t *loose_circ,
  * Choose a suitable next hop in the <b>loose_circ-&gt;cpath-&gthead_ptr</b>,
  * based on <b>state</b>. Append the hop info to head_ptr.
  *
+ * If <b>entry</b> is given, it will be freed.  (We assume that
+ * <b>entry</b> was chosen with loose_circuit_pick_cpath_entry().
+ *
  * Based upon onion_extend_cpath().
  *
  * Return 1 if the path is complete, 0 if we successfully added a hop, and -1
@@ -272,27 +275,22 @@ loose_circuit_extend_cpath(loose_or_circuit_t *loose_circ,
   cpath_build_state_t *state = loose_circ->build_state;
   int cur_len = cpath_get_len(loose_circ->cpath);
   extend_info_t *info = NULL;
-  crypt_path_t *exit = NULL;
 
   if (cur_len >= state->desired_path_len) {
     log_debug(LD_CIRC, "Path is complete: %d steps long",
               state->desired_path_len);
     /* Store the last hop in our build_state so that utilities which expect it
      * to be there have it. */
-    exit = cpath_get_hop(loose_circ->cpath, cur_len);
-    state->chosen_exit = extend_info_dup(exit->extend_info);
+    state->chosen_exit = cpath_get_hop(loose_circ->cpath, cur_len)->extend_info;
     return 1;
   }
 
   log_debug(LD_CIRC, "Path is %d long; we want %d",
                      cur_len, state->desired_path_len);
 
-  if (cur_len == 0) {  /* Use the chosen entry, otherwise fail. */
-    if (entry)
-      info = extend_info_dup(entry);
-    else
-      return -1;
-  } else {             /* Choose ORs until we've reached the desired length. */
+  if (cur_len == 0) { /* Use the chosen entry, otherwise fail. */
+    info = entry;
+  } else {            /* Choose ORs until we've reached the desired length. */
     const node_t *r =
       choose_good_middle_server(purpose, state, loose_circ->cpath, cur_len);
     if (r) {
@@ -306,7 +304,7 @@ loose_circuit_extend_cpath(loose_or_circuit_t *loose_circ,
     return -1;
   }
   log_debug(LD_CIRC, "Chose router %s for hop %d in loose circuit",
-                      extend_info_describe(info), cur_len+1);
+                      extend_info_describe(info), cur_len + 1);
   onion_append_hop(&loose_circ->cpath, info);
   extend_info_free(info);
 
@@ -501,7 +499,7 @@ loose_circuit_log_path(int severity, unsigned int domain,
 
 /**
  * Returns true if we should use CREATE_FAST cells to establish a connection
- * to the first injected hop in a loose-source routed circuit.
+ * to the first additional hop in a loose-source routed circuit.
  *
  * Returns true always.
  */
@@ -548,7 +546,7 @@ loose_circuit_handle_first_hop(loose_or_circuit_t *loose_circ)
     log_info(LD_CIRC, "Next router is %s: %s",
              safe_str(extend_info_describe(firsthop->extend_info)),
              msg ? msg : "???");
-    loose_circ->or_.base_.n_hop = extend_info_dup(firsthop->extend_info);
+    LOOSE_TO_CIRCUIT(loose_circ)->n_hop = extend_info_dup(firsthop->extend_info);
 
     if (should_launch) {
       n_chan = channel_connect_for_circuit(
@@ -571,15 +569,15 @@ loose_circuit_handle_first_hop(loose_or_circuit_t *loose_circ)
      * may already have been) whenever n_chan reaches OR_CONN_STATE_OPEN. */
     return 0;
   } else {  /* We already have an open connection. Use it. */
-    tor_assert(!loose_circ->or_.base_.n_hop);
-    loose_circ->or_.base_.n_chan = n_chan;
+    tor_assert(! LOOSE_TO_CIRCUIT(loose_circ)->n_hop);
+    LOOSE_TO_CIRCUIT(loose_circ)->n_chan = n_chan;
     log_debug(LD_CIRC, "Connection to %s for loose circuit open. "
                        "Delivering first onion skin.",
                        safe_str(fmt_addrport(&firsthop->extend_info->addr,
                                              firsthop->extend_info->port)));
     if ((err_reason = loose_circuit_send_next_onion_skin(loose_circ)) < 0) {
       log_info(LD_CIRC, "loose_circuit_send_next_onion_skin failed.");
-      loose_circ->or_.base_.n_chan = NULL;
+      LOOSE_TO_CIRCUIT(loose_circ)->n_chan = NULL;
       return err_reason;
     }
   }
@@ -891,6 +889,14 @@ loose_circuit_has_opened(loose_or_circuit_t *loose_circ)
   circuit_set_state(LOOSE_TO_CIRCUIT(loose_circ), CIRCUIT_STATE_OPEN);
   log_info(LD_CIRC, "Loose circuit %d built!",
            LOOSE_TO_CIRCUIT(loose_circ)->global_circuitlist_idx);
+
+  if (loose_circ->p_chan_relay_cell) {
+    log_debug(LD_CIRC, "Loose circuit %d has a stored relay cell. Sending...",
+              LOOSE_TO_CIRCUIT(loose_circ)->global_circuitlist_idx);
+    if (loose_circuit_process_relay_cell(loose_circ, NULL, NULL,
+                                         CELL_DIRECTION_OUT, 0) < 0)
+      log_debug(LD_CIRC, "There was a problem processing the stored relay cell.");
+  }
 }
 
 /**
@@ -950,6 +956,8 @@ loose_circuit_extend_to_next_hop(loose_or_circuit_t *loose_circ)
   crypt_path_t *hop;
   int len;
 
+  tor_assert(loose_circ);
+  tor_assert(CIRCUIT_IS_LOOSE(loose_circ));
   tor_assert(loose_circ->cpath->state == CPATH_STATE_OPEN);
   tor_assert((LOOSE_TO_CIRCUIT(loose_circ))->state == CIRCUIT_STATE_BUILDING);
   hop = onion_next_hop_in_cpath(loose_circ->cpath);
@@ -957,12 +965,6 @@ loose_circuit_extend_to_next_hop(loose_or_circuit_t *loose_circ)
 
   log_debug(LD_CIRC, "Extending loose circuit to %s.",
                      hop->extend_info->identity_digest);
-
-  if (!(CIRCUIT_IS_LOOSE(loose_circ))) {
-    log_warn(LD_BUG, "Tried to call loose_circuit_extend_to_next_hop() with "
-                     "something that isn't a loose circuit!");
-    return -END_CIRC_REASON_INTERNAL;
-  }
 
   if (tor_addr_family(&hop->extend_info->addr) != AF_INET) {
     log_warn(LD_BUG, "Trying to extend to a non-IPv4 address.");
@@ -1005,11 +1007,10 @@ loose_circuit_extend_to_next_hop(loose_or_circuit_t *loose_circ)
 
     /* Send it to hop->prev, because it will transfer it to a create cell and
      * then send to hop. */
-    /* XXXprop#188  WAT.  Is this really what we do??? */
     if (relay_send_command_from_edge(0, LOOSE_TO_CIRCUIT(loose_circ), command,
                                      (char*)payload, payload_len,
                                      hop->prev) < 0) {
-      return 0; /* Circuit is closed.*/
+      return 0; /* Circuit is closed. */
     }
     hop->state = CPATH_STATE_AWAITING_KEYS;
   }
@@ -1036,6 +1037,10 @@ loose_circuit_relay_cell_incoming(loose_or_circuit_t *loose_circ,
             cell_command_to_string(cell->command),
             LOOSE_TO_CIRCUIT(loose_circ)->global_circuitlist_idx);
 
+  assert_circuit_ok(LOOSE_TO_CIRCUIT(loose_circ));
+  if (LOOSE_TO_CIRCUIT(loose_circ)->marked_for_close)
+    return 0;
+
   /* Set the circ_id to the one for the previous hop. */
   cell->circ_id = LOOSE_TO_OR_CIRCUIT(loose_circ)->p_circ_id;
   chan = LOOSE_TO_OR_CIRCUIT(loose_circ)->p_chan;
@@ -1049,13 +1054,9 @@ loose_circuit_relay_cell_incoming(loose_or_circuit_t *loose_circ,
   /* Iterate through all the additional hops in our loose_circ->cpath (in
    * forward order) and decrypt the cell w.r.t. each hop in turn. */
   do {
-    if (PREDICT_UNLIKELY(!this_hop)) {
-      log_warn(LD_OR, "Additional hop for loose circuit was strangely "
-                      "missing! Closing circuit.");
-      return -END_CIRC_REASON_INTERNAL;
-    }
     log_debug(LD_OR, "Decrypting a relay cell layer for loose circuit.");
-    if (crypto_cipher_crypt_inplace(this_hop->f_crypto,
+    tor_assert(this_hop);
+    if (crypto_cipher_crypt_inplace(this_hop->b_crypto,
                                     (char *)cell->payload,
                                     CELL_PAYLOAD_SIZE) < 0) {
       log_warn(LD_BUG, "Error decrypting relay cell payload! Closing.");
@@ -1079,12 +1080,17 @@ loose_circuit_relay_cell_incoming(loose_or_circuit_t *loose_circ,
     this_hop = this_hop->next;
   } while (this_hop != cpath && this_hop->state == CPATH_STATE_OPEN);
 
-  if (!layer_hint) {
-    log_debug(LD_OR, "Incoming relay cell on loose circuit not recognized.");
+  if (layer_hint)
     return -END_CIRC_REASON_TORPROTOCOL;
+
+  log_debug(LD_CIRC, "Encrypting layer towards OP.");
+  if (crypto_cipher_crypt_inplace(LOOSE_TO_OR_CIRCUIT(loose_circ)->p_crypto,
+                                  (char *)cell->payload,
+                                  CELL_PAYLOAD_SIZE) < 0) {
+    log_warn(LD_BUG, "Error encrypting relay cell payload to OP! Closing.");
+    return -END_CIRC_REASON_INTERNAL;
   }
 
-  ++stats_n_relay_cells_relayed;
   append_cell_to_circuit_queue(LOOSE_TO_CIRCUIT(loose_circ), chan,
                                cell, CELL_DIRECTION_IN, rh.stream_id);
   return 0;
@@ -1111,29 +1117,44 @@ loose_circuit_relay_cell_outgoing(loose_or_circuit_t *loose_circ,
   crypt_path_t *this_hop; /* The hop we're currently encrypting to. */
 
   log_debug(LD_OR,
-            "Handling outgoing relay cell type %d on loose circuit %d.",
-            cell->command,
+            "Handling outgoing relay cell type %s on loose circuit %d.",
+            cell_command_to_string(cell->command),
             LOOSE_TO_CIRCUIT(loose_circ)->global_circuitlist_idx);
 
-  tor_assert(loose_circ->cpath);
+  assert_circuit_ok(LOOSE_TO_CIRCUIT(loose_circ));
+  if (LOOSE_TO_CIRCUIT(loose_circ)->marked_for_close)
+    return 0;
+
+  /* Decrypt the layer from the OP. */
+  log_debug(LD_CIRC, "Decrypting layer from OP.");
+  if (crypto_cipher_crypt_inplace(LOOSE_TO_OR_CIRCUIT(loose_circ)->n_crypto,
+                                  (char *)cell->payload,
+                                  CELL_PAYLOAD_SIZE) < 0) {
+    log_warn(LD_BUG, "Error derypting relay cell payload from OP! Closing.");
+    return -END_CIRC_REASON_INTERNAL;
+  }
 
   /* Set the circ_id to the one for the next hop. */
   cell->circ_id = LOOSE_TO_CIRCUIT(loose_circ)->n_circ_id;
   chan = LOOSE_TO_CIRCUIT(loose_circ)->n_chan;
-  this_hop = loose_circ->cpath->prev; /* Take the last loose hop first. */
 
-  tor_assert(this_hop->f_digest);
+  /* XXX There is a very strange problem where (only when running with
+   * TestingTorNetwork, e.g. in chutney) *after* a small number of outgoing
+   * relay cells have already been sent, the channel disappears! */
+  if (!chan) {
+    log_warn(LD_OR, "Channel disappeared on loose circuit %d! Dropping cell.",
+             LOOSE_TO_CIRCUIT(loose_circ)->global_circuitlist_idx);
+    return 0;
+  }
+
+  this_hop = loose_circ->cpath->prev; /* Take the last loose hop first. */
   relay_set_digest(this_hop->f_digest, cell);
 
   /* Iterate through all the additional hops in our loose_circ->cpath (in
    * reverse) and encrypt the cell to each hop in turn. */
   do {
-    if (PREDICT_UNLIKELY(!this_hop)) {
-      log_warn(LD_OR, "Additional hop for loose circuit was strangely "
-                      "missing! Closing circuit.");
-      return -END_CIRC_REASON_INTERNAL;
-    }
     log_debug(LD_OR, "Encrypting relay cell layer for loose circuit.");
+    tor_assert(this_hop);
     if (crypto_cipher_crypt_inplace(this_hop->f_crypto,
                                     (char *)cell->payload,
                                     CELL_PAYLOAD_SIZE) < 0) {
@@ -1143,7 +1164,6 @@ loose_circuit_relay_cell_outgoing(loose_or_circuit_t *loose_circ,
     this_hop = this_hop->prev;
   } while (this_hop != loose_circ->cpath->prev);
 
-  ++stats_n_relay_cells_relayed;
   append_cell_to_circuit_queue(LOOSE_TO_CIRCUIT(loose_circ), chan,
                                cell, CELL_DIRECTION_OUT, 0);
   return 0;
@@ -1164,8 +1184,7 @@ loose_circuit_check_relay_cell_header(cell_t *cell)
   relay_header_unpack(&rh, cell->payload);
 
   if (rh.length > RELAY_PAYLOAD_SIZE) {
-    log_fn(LOG_PROTOCOL_WARN, LD_PROTOCOL,
-           "Relay cell length field too long. Closing circuit.");
+    log_warn(LD_PROTOCOL, "Relay cell length field too long. Closing.");
     return -END_CIRC_REASON_TORPROTOCOL;
   }
 
@@ -1177,15 +1196,13 @@ loose_circuit_check_relay_cell_header(cell_t *cell)
       case RELAY_COMMAND_RESOLVE:
       case RELAY_COMMAND_RESOLVED:
       case RELAY_COMMAND_BEGIN_DIR:
-        log_fn(LOG_PROTOCOL_WARN, LD_PROTOCOL,
-               "Relay command %s with zero stream_id. Dropping.",
-               cell_command_to_string(cell->command));
+        log_warn(LD_PROTOCOL, "Relay command %s with stream_id 0. Dropping.",
+                              cell_command_to_string(cell->command));
         return 0;
       default:
         ;
     }
   }
-
   return 1;
 }
 
@@ -1272,7 +1289,6 @@ loose_circuit_process_relay_cell(loose_or_circuit_t *loose_circ,
       log_debug(LD_CIRC, "Problem sending stored relay_early cell.");
       return reason;
     }
-    ++stats_n_relay_cells_delivered;
   }
 
   if (!cell) { /* We must have been called from loose_circuit_has_opened() */
@@ -1293,20 +1309,23 @@ loose_circuit_process_relay_cell(loose_or_circuit_t *loose_circ,
       return reason;
     }
   }
-  ++stats_n_relay_cells_delivered;
 
   /* Heading towards the OP's next chosen hop.  We'll need to wrap whatever
    * this thing is up in a RELAY_EARLY cell and pass it along. */
   if (cell_direction == CELL_DIRECTION_OUT) {
     log_debug(LD_OR, "Sending away from origin.");
-    return loose_circuit_relay_cell_outgoing(loose_circ, layer_hint, cell);
+    reason = loose_circuit_relay_cell_outgoing(loose_circ, layer_hint, cell);
+  } else {
+    /* Heading towards the OP.  We'll need to unwrap and decrypt all
+     * of the loose onion layers. */
+    log_debug(LD_OR, "Sending towards origin.");
+    reason = loose_circuit_relay_cell_incoming(loose_circ, layer_hint, cell);
   }
-  /* Heading towards the OP (CELL_DIRECTION_IN).  There's no other possibility
-   * here, because we asserted earlier that the direction was out or in, so we
-   * don't need to explicitly check.  We'll need to unwrap and decrypt all of
-   * the loose onion layers. */
-  log_debug(LD_OR, "Sending towards origin.");
-  return loose_circuit_relay_cell_incoming(loose_circ, layer_hint, cell);
+
+  if (reason == 0)
+    ++stats_n_relay_cells_relayed;
+
+  return reason;
 }
 
 /**
