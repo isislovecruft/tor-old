@@ -15,9 +15,11 @@
 extern uint64_t stats_n_relay_cells_relayed;
 extern uint64_t stats_n_relay_cells_delivered;
 
+void relay_set_digest(crypto_digest_t *digest, cell_t *cell);
+int relay_digest_matches(crypto_digest_t *digest, cell_t *cell);
+void relay_increment_relay_cells_relayed(void);
 int circuit_receive_relay_cell(cell_t *cell, circuit_t *circ,
                                cell_direction_t cell_direction);
-
 void relay_header_pack(uint8_t *dest, const relay_header_t *src);
 void relay_header_unpack(relay_header_t *dest, const uint8_t *src);
 int relay_send_command_from_edge_(streamid_t stream_id, circuit_t *circ,
@@ -57,9 +59,10 @@ void cell_queue_append_packed_copy(circuit_t *circ, cell_queue_t *queue,
                                    int exitward, const cell_t *cell,
                                    int wide_circ_ids, int use_stats);
 
-void append_cell_to_circuit_queue(circuit_t *circ, channel_t *chan,
-                                  cell_t *cell, cell_direction_t direction,
-                                  streamid_t fromstream);
+MOCK_DECL(void, append_cell_to_circuit_queue,
+          (circuit_t *circ, channel_t *chan,
+           cell_t *cell, cell_direction_t direction,
+           streamid_t fromstream));
 void channel_unlink_all_circuits(channel_t *chan, smartlist_t *detached_out);
 MOCK_DECL(int, channel_flush_from_first_active_circuit,
           (channel_t *chan, int max));

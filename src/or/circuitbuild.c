@@ -28,6 +28,7 @@
 #include "control.h"
 #include "directory.h"
 #include "entrynodes.h"
+#include "loose.h"
 #include "main.h"
 #include "microdesc.h"
 #include "networkstatus.h"
@@ -49,26 +50,19 @@
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #endif
 
-static channel_t * channel_connect_for_circuit(const tor_addr_t *addr,
-                                               uint16_t port,
-                                               const char *id_digest);
-static int circuit_deliver_create_cell(circuit_t *circ,
-                                       const create_cell_t *create_cell,
-                                       int relayed);
+static void circuit_list_cpath_impl(crypt_path_t *cpath, smartlist_t *elements,
+                                    int verbose, int verbose_names);
 static int onion_pick_cpath_exit(origin_circuit_t *circ, extend_info_t *exit);
-static crypt_path_t *onion_next_hop_in_cpath(crypt_path_t *cpath);
 static int onion_extend_cpath(origin_circuit_t *circ);
 static int count_acceptable_nodes(smartlist_t *routers);
-static int onion_append_hop(crypt_path_t **head_ptr, extend_info_t *choice);
-static int circuits_can_use_ntor(void);
 
 /** This function tries to get a channel to the specified endpoint,
  * and then calls command_setup_channel() to give it the right
  * callbacks.
  */
-static channel_t *
-channel_connect_for_circuit(const tor_addr_t *addr, uint16_t port,
-                            const char *id_digest)
+MOCK_IMPL(channel_t *,
+channel_connect_for_circuit,(const tor_addr_t *addr, uint16_t port,
+                             const char *id_digest))
 {
   channel_t *chan;
 
@@ -215,46 +209,39 @@ get_unique_circ_id_by_chan(channel_t *chan)
   return test_circ_id;
 }
 
-/** If <b>verbose</b> is false, allocate and return a comma-separated list of
+/** Iterate through the hops in <b>cpath</b>, and allocate and return
+ * information about the hops.
+ *
+ * If <b>verbose</b> is false, allocate and return a comma-separated list of
  * the currently built elements of <b>circ</b>. If <b>verbose</b> is true, also
  * list information about link status in a more verbose format using spaces.
+ *
  * If <b>verbose_names</b> is false, give nicknames for Named routers and hex
  * digests for others; if <b>verbose_names</b> is true, use $DIGEST=Name style
  * names.
  */
-static char *
-circuit_list_path_impl(origin_circuit_t *circ, int verbose, int verbose_names)
+static void
+circuit_list_cpath_impl(crypt_path_t *cpath, smartlist_t *elements,
+                        int verbose, int verbose_names)
 {
   crypt_path_t *hop;
-  smartlist_t *elements;
   const char *states[] = {"closed", "waiting for keys", "open"};
-  char *s;
 
-  elements = smartlist_new();
+  hop = cpath;
 
-  if (verbose) {
-    const char *nickname = build_state_get_exit_nickname(circ->build_state);
-    smartlist_add_asprintf(elements, "%s%s circ (length %d%s%s):",
-                 circ->build_state->is_internal ? "internal" : "exit",
-                 circ->build_state->need_uptime ? " (high-uptime)" : "",
-                 circ->build_state->desired_path_len,
-                 circ->base_.state == CIRCUIT_STATE_OPEN ? "" : ", last hop ",
-                 circ->base_.state == CIRCUIT_STATE_OPEN ? "" :
-                 (nickname?nickname:"*unnamed*"));
-  }
-
-  hop = circ->cpath;
   do {
     char *elt;
     const char *id;
     const node_t *node;
-    if (!hop)
+
+    if ((!hop) || (!hop->extend_info))
       break;
+
     if (!verbose && hop->state != CPATH_STATE_OPEN)
       break;
-    if (!hop->extend_info)
-      break;
+
     id = hop->extend_info->identity_digest;
+
     if (verbose_names) {
       elt = tor_malloc(MAX_VERBOSE_NICKNAME_LEN+1);
       if ((node = node_get_by_id(id))) {
@@ -282,15 +269,57 @@ circuit_list_path_impl(origin_circuit_t *circ, int verbose, int verbose_names)
     tor_assert(elt);
     if (verbose) {
       tor_assert(hop->state <= 2);
-      smartlist_add_asprintf(elements,"%s(%s)",elt,states[hop->state]);
+      smartlist_add_asprintf(elements, "%s(%s)", elt, states[hop->state]);
       tor_free(elt);
     } else {
       smartlist_add(elements, elt);
     }
     hop = hop->next;
-  } while (hop != circ->cpath);
+  } while (hop != cpath);
+}
 
-  s = smartlist_join_strings(elements, verbose?" ":",", 0, NULL);
+/** Iterate through the hops in <b>cpath</b>, and allocate and return
+ * information about the hops.
+ *
+ * If <b>verbose</b> is false, allocate and return a comma-separated list of
+ * the currently built elements of <b>circ</b>. If <b>verbose</b> is true, also
+ * list information about link status in a more verbose format using spaces.
+ */
+void
+circuit_list_cpath(crypt_path_t *cpath, smartlist_t *elements, int verbose)
+{
+  circuit_list_cpath_impl(cpath, elements, verbose, 0);
+}
+
+/** If <b>verbose</b> is false, allocate and return a comma-separated list of
+ * the currently built elements of <b>circ</b>. If <b>verbose</b> is true, also
+ * list information about link status in a more verbose format using spaces.
+ * If <b>verbose_names</b> is false, give nicknames for Named routers and hex
+ * digests for others; if <b>verbose_names</b> is true, use $DIGEST=Name style
+ * names.
+ */
+static char *
+circuit_list_path_impl(origin_circuit_t *circ, int verbose, int verbose_names)
+{
+  smartlist_t *elements;
+  char *s;
+
+  elements = smartlist_new();
+
+  if (verbose) {
+    const char *nickname = build_state_get_exit_nickname(circ->build_state);
+    smartlist_add_asprintf(elements, "%s%s circ (length %d%s%s):",
+                 circ->build_state->is_internal ? "internal" : "exit",
+                 circ->build_state->need_uptime ? " (high-uptime)" : "",
+                 circ->build_state->desired_path_len,
+                 circ->base_.state == CIRCUIT_STATE_OPEN ? "" : ", last hop ",
+                 circ->base_.state == CIRCUIT_STATE_OPEN ? "" :
+                 (nickname?nickname:"*unnamed*"));
+  }
+
+  circuit_list_cpath(circ->cpath, elements, verbose);
+
+  s = smartlist_join_strings(elements, verbose ? " " : ",", 0, NULL);
   SMARTLIST_FOREACH(elements, char*, cp, tor_free(cp));
   smartlist_free(elements);
   return s;
@@ -334,6 +363,7 @@ circuit_log_path(int severity, unsigned int domain, origin_circuit_t *circ)
  * unable to extend.
  */
 /* XXXX Someday we should learn from OR circuits too. */
+/* XXXX Someday we should probably do this for loose circuits too. -IL */
 void
 circuit_rep_hist_note_result(origin_circuit_t *circ)
 {
@@ -367,13 +397,15 @@ circuit_rep_hist_note_result(origin_circuit_t *circ)
   } while (hop!=circ->cpath);
 }
 
-/** Return 1 iff at least one node in circ's cpath supports ntor. */
-static int
-circuit_cpath_supports_ntor(const origin_circuit_t *circ)
+/** Return 1 iff at least one node in circ's cpath supports ntor.
+ * Helper function for circuit_cpath_supports_ntor.
+ */
+int
+cpath_supports_ntor(crypt_path_t *const cpath_orig)
 {
   crypt_path_t *head, *cpath;
 
-  cpath = head = circ->cpath;
+  cpath = head = cpath_orig;
   do {
     if (cpath->extend_info &&
         !tor_mem_is_zero(
@@ -385,6 +417,13 @@ circuit_cpath_supports_ntor(const origin_circuit_t *circ)
   } while (cpath != head);
 
   return 0;
+}
+
+/** Return 1 iff at least one node in circ's cpath supports ntor. */
+static int
+circuit_cpath_supports_ntor(const origin_circuit_t *circ)
+{
+  return cpath_supports_ntor(circ->cpath);
 }
 
 /** Pick all the entries in our cpath. Stop and return 0 when we're
@@ -618,6 +657,14 @@ circuit_n_chan_done(channel_t *chan, int status, int close_origin_circuits)
           /* XXX could this be bad, eg if next_onion_skin failed because conn
            *     died? */
         }
+      } else if (CIRCUIT_IS_LOOSE(circ)) {
+        loose_or_circuit_t *loose_circ = TO_LOOSE_CIRCUIT(circ);
+
+        if ((err_reason = loose_circuit_send_next_onion_skin(loose_circ)) < 0) {
+          log_info(LD_CIRC, "loose_circuit_send_next_onion_skin failed.");
+          circuit_mark_for_close(circ, -err_reason);
+          continue;
+        }
       } else {
         /* pull the create cell out of circ->n_chan_create_cell, and send it */
         tor_assert(circ->n_chan_create_cell);
@@ -641,9 +688,9 @@ circuit_n_chan_done(channel_t *chan, int status, int close_origin_circuits)
  * gave us via an EXTEND cell, so we shouldn't worry if we don't understand
  * it. Return -1 if we failed to find a suitable circid, else return 0.
  */
-static int
-circuit_deliver_create_cell(circuit_t *circ, const create_cell_t *create_cell,
-                            int relayed)
+MOCK_IMPL(int,
+circuit_deliver_create_cell,(circuit_t *circ, const create_cell_t *create_cell,
+                             int relayed))
 {
   cell_t cell;
   circid_t id;
@@ -737,16 +784,16 @@ inform_testing_reachability(void)
 
 /** Return true iff we should send a create_fast cell to start building a given
  * circuit */
-static INLINE int
-should_use_create_fast_for_circuit(origin_circuit_t *circ)
+int
+should_use_create_fast_for_circuit_cpath(const crypt_path_t *cpath)
 {
   const or_options_t *options = get_options();
-  tor_assert(circ->cpath);
-  tor_assert(circ->cpath->extend_info);
+  tor_assert(cpath);
+  tor_assert(cpath->extend_info);
 
-  if (!circ->cpath->extend_info->onion_key)
+  if (!cpath->extend_info->onion_key)
     return 1; /* our hand is forced: only a create_fast will work. */
-  if (public_server_mode(options)) {
+  if (server_mode(options)) {
     /* We're a server, and we know an onion key. We can choose.
      * Prefer to blend our circuit into the other circuits we are
      * creating on behalf of others. */
@@ -775,7 +822,7 @@ circuit_timeout_want_to_count_circ(origin_circuit_t *circ)
 /** Return true if the ntor handshake is enabled in the configuration, or if
  * it's been set to "auto" in the configuration and it's enabled in the
  * consensus. */
-static int
+int
 circuits_can_use_ntor(void)
 {
   const or_options_t *options = get_options();
@@ -787,7 +834,7 @@ circuits_can_use_ntor(void)
 /** Decide whether to use a TAP or ntor handshake for connecting to <b>ei</b>
  * directly, and set *<b>cell_type_out</b> and *<b>handshake_type_out</b>
  * accordingly. */
-static void
+void
 circuit_pick_create_handshake(uint8_t *cell_type_out,
                               uint16_t *handshake_type_out,
                               const extend_info_t *ei)
@@ -809,7 +856,7 @@ circuit_pick_create_handshake(uint8_t *cell_type_out,
  * in extending through <b>node</b> to do so, we should use an EXTEND2 or an
  * EXTEND cell to do so, and set *<b>cell_type_out</b> and
  * *<b>create_cell_type_out</b> accordingly. */
-static void
+void
 circuit_pick_extend_handshake(uint8_t *cell_type_out,
                               uint8_t *create_cell_type_out,
                               uint16_t *handshake_type_out,
@@ -864,7 +911,7 @@ circuit_send_next_onion_skin(origin_circuit_t *circ)
       control_event_bootstrap(BOOTSTRAP_STATUS_CIRCUIT_CREATE, 0);
 
     node = node_get_by_id(circ->base_.n_chan->identity_digest);
-    fast = should_use_create_fast_for_circuit(circ);
+    fast = should_use_create_fast_for_circuit_cpath(circ->cpath);
     if (!fast) {
       /* We are an OR and we know the right onion key: we should
        * send a create cell.
@@ -970,6 +1017,11 @@ circuit_send_next_onion_skin(origin_circuit_t *circ)
         if (server_mode(options) && !check_whether_orport_reachable()) {
           inform_testing_reachability();
           consider_testing_reachability(1, 1);
+        }
+        if (bridge_server_mode(options) && !loose_circuits_are_possible) {
+          log_notice(LD_CIRC, "We should now be able to create loose-source "
+                              "routed circuits.");
+          loose_circuits_are_possible = 1;
         }
       }
 
@@ -1374,7 +1426,9 @@ onionskin_answer(or_circuit_t *circ,
   tmp_cpath = tor_malloc_zero(sizeof(crypt_path_t));
   tmp_cpath->magic = CRYPT_PATH_MAGIC;
 
-  circuit_set_state(TO_CIRCUIT(circ), CIRCUIT_STATE_OPEN);
+  if (!CIRCUIT_IS_LOOSE(circ)) {
+    circuit_set_state(TO_CIRCUIT(circ), CIRCUIT_STATE_OPEN);
+  }
 
   log_debug(LD_CIRC,"init digest forward 0x%.8x, backward 0x%.8x.",
             (unsigned int)get_uint32(keys),
@@ -2083,11 +2137,11 @@ onion_append_to_cpath(crypt_path_t **head_ptr, crypt_path_t *new_hop)
  * circuit. In particular, make sure we don't pick the exit node or its
  * family, and make sure we don't duplicate any previous nodes or their
  * families. */
-static const node_t *
-choose_good_middle_server(uint8_t purpose,
-                          cpath_build_state_t *state,
-                          crypt_path_t *head,
-                          int cur_len)
+MOCK_IMPL(const node_t *,
+choose_good_middle_server,(uint8_t purpose,
+                           cpath_build_state_t *state,
+                           crypt_path_t *head,
+                           int cur_len))
 {
   int i;
   const node_t *r, *choice;
@@ -2130,8 +2184,8 @@ choose_good_middle_server(uint8_t purpose,
  * guard, not for any particular circuit.
  */
 /* XXXX024 I'd like to have this be static again, but entrynodes.c needs it. */
-const node_t *
-choose_good_entry_server(uint8_t purpose, cpath_build_state_t *state)
+MOCK_IMPL(const node_t *,
+choose_good_entry_server,(uint8_t purpose, cpath_build_state_t *state))
 {
   const node_t *choice;
   smartlist_t *excluded;
@@ -2197,7 +2251,7 @@ choose_good_entry_server(uint8_t purpose, cpath_build_state_t *state)
 
 /** Return the first non-open hop in cpath, or return NULL if all
  * hops are open. */
-static crypt_path_t *
+crypt_path_t *
 onion_next_hop_in_cpath(crypt_path_t *cpath)
 {
   crypt_path_t *hop = cpath;
@@ -2270,7 +2324,7 @@ onion_extend_cpath(origin_circuit_t *circ)
 /** Create a new hop, annotate it with information about its
  * corresponding router <b>choice</b>, and append it to the
  * end of the cpath <b>head_ptr</b>. */
-static int
+int
 onion_append_hop(crypt_path_t **head_ptr, extend_info_t *choice)
 {
   crypt_path_t *hop = tor_malloc_zero(sizeof(crypt_path_t));

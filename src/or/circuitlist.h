@@ -31,6 +31,7 @@ time_t circuit_id_when_marked_unusable_on_channel(circid_t circ_id,
 void circuit_set_state(circuit_t *circ, uint8_t state);
 void circuit_close_all_marked(void);
 int32_t circuit_initial_package_window(void);
+void init_circuit_base(circuit_t *circ);
 origin_circuit_t *origin_circuit_new(void);
 or_circuit_t *or_circuit_new(circid_t p_circ_id, channel_t *p_chan);
 circuit_t *circuit_get_by_circid_channel(circid_t circ_id,
@@ -56,8 +57,10 @@ void circuit_mark_all_unused_circs(void);
 void circuit_mark_all_dirty_circs_as_unusable(void);
 MOCK_DECL(void, circuit_mark_for_close_, (circuit_t *circ, int reason,
                                           int line, const char *file));
+int cpath_get_len(crypt_path_t *cpath_orig);
 int circuit_get_cpath_len(origin_circuit_t *circ);
 void circuit_clear_cpath(origin_circuit_t *circ);
+crypt_path_t *cpath_get_hop(crypt_path_t *cpath_orig, int hopnum);
 crypt_path_t *circuit_get_cpath_hop(origin_circuit_t *circ, int hopnum);
 void circuit_get_all_pending_on_channel(smartlist_t *out,
                                         channel_t *chan);
@@ -69,6 +72,7 @@ int circuit_count_pending_on_channel(channel_t *chan);
 void assert_cpath_layer_ok(const crypt_path_t *cp);
 void assert_circuit_ok(const circuit_t *c);
 void circuit_free_all(void);
+void circuit_free_cpath_node(crypt_path_t *victim);
 void circuits_handle_oom(size_t current_allocation);
 
 void channel_note_destroy_pending(channel_t *chan, circid_t id);
