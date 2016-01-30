@@ -102,7 +102,7 @@ rend_mid_establish_intro(or_circuit_t *circ, const uint8_t *request,
   }
 
   /* Acknowledge the request. */
-  if (relay_send_command_from_edge(0, TO_CIRCUIT(circ),
+  if (relay_send_command(0, TO_CIRCUIT(circ),
                                    RELAY_COMMAND_INTRO_ESTABLISHED,
                                    "", 0, NULL)<0) {
     log_info(LD_GENERAL, "Couldn't send INTRO_ESTABLISHED cell.");
@@ -195,7 +195,7 @@ rend_mid_introduce(or_circuit_t *circ, const uint8_t *request,
            (unsigned)intro_circ->p_circ_id);
 
   /* Great.  Now we just relay the cell down the circuit. */
-  if (relay_send_command_from_edge(0, TO_CIRCUIT(intro_circ),
+  if (relay_send_command(0, TO_CIRCUIT(intro_circ),
                                    RELAY_COMMAND_INTRODUCE2,
                                    (char*)request, request_len, NULL)) {
     log_warn(LD_GENERAL,
@@ -203,7 +203,7 @@ rend_mid_introduce(or_circuit_t *circ, const uint8_t *request,
     goto err;
   }
   /* And send an ack down Alice's circuit.  Empty body means succeeded. */
-  if (relay_send_command_from_edge(0,TO_CIRCUIT(circ),
+  if (relay_send_command(0,TO_CIRCUIT(circ),
                                    RELAY_COMMAND_INTRODUCE_ACK,
                                    NULL,0,NULL)) {
     log_warn(LD_GENERAL, "Unable to send INTRODUCE_ACK cell to Tor client.");
@@ -215,7 +215,7 @@ rend_mid_introduce(or_circuit_t *circ, const uint8_t *request,
  err:
   /* Send the client a NACK */
   nak_body[0] = 1;
-  if (relay_send_command_from_edge(0,TO_CIRCUIT(circ),
+  if (relay_send_command(0,TO_CIRCUIT(circ),
                                    RELAY_COMMAND_INTRODUCE_ACK,
                                    nak_body, 1, NULL)) {
     log_warn(LD_GENERAL, "Unable to send NAK to Tor client.");
@@ -264,7 +264,7 @@ rend_mid_establish_rendezvous(or_circuit_t *circ, const uint8_t *request,
   }
 
   /* Acknowledge the request. */
-  if (relay_send_command_from_edge(0,TO_CIRCUIT(circ),
+  if (relay_send_command(0,TO_CIRCUIT(circ),
                                    RELAY_COMMAND_RENDEZVOUS_ESTABLISHED,
                                    "", 0, NULL)<0) {
     log_warn(LD_PROTOCOL, "Couldn't send RENDEZVOUS_ESTABLISHED cell.");
@@ -338,7 +338,7 @@ rend_mid_rendezvous(or_circuit_t *circ, const uint8_t *request,
   }
 
   /* Send the RENDEZVOUS2 cell to Alice. */
-  if (relay_send_command_from_edge(0, TO_CIRCUIT(rend_circ),
+  if (relay_send_command(0, TO_CIRCUIT(rend_circ),
                                    RELAY_COMMAND_RENDEZVOUS2,
                                    (char*)(request+REND_COOKIE_LEN),
                                    request_len-REND_COOKIE_LEN, NULL)) {
