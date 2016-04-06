@@ -93,7 +93,7 @@ need-chutney-path:
 
 # Note that test-network requires a copy of Chutney in $CHUTNEY_PATH.
 # Chutney can be cloned from https://git.torproject.org/chutney.git .
-test-network: need-chutney-path all $(TESTING_TOR_BINARY)
+test-network: need-chutney-path $(TESTING_TOR_BINARY) src/tools/tor-gencert
 	$(top_srcdir)/src/test/test-network.sh $(TEST_NETWORK_FLAGS)
 
 # Run all available tests using automake's test-driver
@@ -101,7 +101,7 @@ test-network: need-chutney-path all $(TESTING_TOR_BINARY)
 # some IPv6 tests will fail without an IPv6 DNS server (see #16971 and #17011)
 # only run mixed tests if we have a tor-stable binary
 # see #17015 for autodetection of different tor versions
-test-network-all: need-chutney-path all test-driver $(TESTING_TOR_BINARY)
+test-network-all: need-chutney-path test-driver $(TESTING_TOR_BINARY) src/tools/tor-gencert
 	mkdir -p $(TEST_NETWORK_ALL_LOG_DIR)
 	@flavors="$(TEST_CHUTNEY_FLAVORS)"; \
 	if ping6 -q -o ::1 >/dev/null 2>&1; then \
