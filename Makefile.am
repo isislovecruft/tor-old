@@ -20,8 +20,10 @@ SHELL = @SHELL@
 
 if COVERAGE_ENABLED
 TESTING_TOR_BINARY=$(top_builddir)/src/or/tor-cov$(EXEEXT)
+TESTING_TOR_GENCERT_BINARY=$(top_builddir)/src/tools/tor-cov-gencert$(EXEEXT)
 else
 TESTING_TOR_BINARY=$(top_builddir)/src/or/tor$(EXEEXT)
+TESTING_TOR_GENCERT_BINARY=$(top_builddir)/src/tools/tor-gencert$(EXEEXT)
 endif
 
 include src/include.am
@@ -93,7 +95,7 @@ need-chutney-path:
 
 # Note that test-network requires a copy of Chutney in $CHUTNEY_PATH.
 # Chutney can be cloned from https://git.torproject.org/chutney.git .
-test-network: need-chutney-path $(TESTING_TOR_BINARY) src/tools/tor-gencert
+test-network: need-chutney-path $(TESTING_TOR_BINARY) $(TESTING_TOR_GENCERT_BINARY)
 	$(top_srcdir)/src/test/test-network.sh $(TEST_NETWORK_FLAGS)
 
 # Run all available tests using automake's test-driver
@@ -101,7 +103,7 @@ test-network: need-chutney-path $(TESTING_TOR_BINARY) src/tools/tor-gencert
 # some IPv6 tests will fail without an IPv6 DNS server (see #16971 and #17011)
 # only run mixed tests if we have a tor-stable binary
 # see #17015 for autodetection of different tor versions
-test-network-all: need-chutney-path test-driver $(TESTING_TOR_BINARY) src/tools/tor-gencert
+test-network-all: need-chutney-path test-driver $(TESTING_TOR_BINARY) $(TESTING_TOR_GENCERT_BINARY)
 	mkdir -p $(TEST_NETWORK_ALL_LOG_DIR)
 	@flavors="$(TEST_CHUTNEY_FLAVORS)"; \
 	if ping6 -q -o ::1 >/dev/null 2>&1; then \

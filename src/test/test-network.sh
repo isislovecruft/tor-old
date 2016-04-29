@@ -78,6 +78,7 @@ tor_name=tor
 tor_gencert_name=tor-gencert
 if test "$use_coverage_binary" = true; then
   tor_name=tor-cov
+  tor_gencert_name=tor-cov-gencert
 fi
 export CHUTNEY_TOR="${TOR_DIR}/src/or/${tor_name}"
 export CHUTNEY_TOR_GENCERT="${TOR_DIR}/src/tools/${tor_gencert_name}"
