@@ -1676,7 +1676,7 @@ static int router_has_non_preferred_address_impl(int prefer_ipv6,
  * to non-preferred ORPorts or DirPorts.)
  * If must_have_or is true, only check the ORPort address.
  */
-static int
+STATIC int
 router_has_non_preferred_address(const or_options_t *options,
                                  const routerstatus_t *status,
                                  int must_have_or)
