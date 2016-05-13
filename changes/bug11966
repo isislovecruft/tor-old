@@ -1,0 +1,5 @@
+ o Minor bugfixes (bridge clients):
+   - Add a new bootstrap stage at 18% to signal to bridge clients when
+     they are fetching bridge descriptors.  Fixes a problem with
+     reporting during bootstrap that the consensus fetch failed when
+     really the bridge descriptor fetch failed.  Fixes bug 11966.

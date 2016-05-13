@@ -6015,6 +6015,10 @@ bootstrap_status_to_string(bootstrap_status_t s, const char **tag,
       *tag = "onehop_create";
       *summary = "Establishing an encrypted directory connection";
       break;
+    case BOOTSTRAP_STATUS_REQUESTING_BRIDGE_DESC:
+      *tag = "requesting_bridge_desc";
+      *summary = "Asking for bridge descriptors";
+      break;
     case BOOTSTRAP_STATUS_REQUESTING_STATUS:
       *tag = "requesting_status";
       *summary = "Asking for networkstatus consensus";

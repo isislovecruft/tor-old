@@ -907,6 +907,14 @@ circuit_send_next_onion_skin(origin_circuit_t *circ)
     if (circuit_deliver_create_cell(TO_CIRCUIT(circ), &cc, 0) < 0)
       return - END_CIRC_REASON_RESOURCELIMIT;
 
+    /* We're using this circuit to fetch our bridge descriptors for the
+     * first time, and we don't have any cached bridge descriptors. */
+    if (circ->build_state->onehop_tunnel) {
+      if (get_options()->UseBridges && !any_bridge_descriptors_known()) {
+        control_event_bootstrap(BOOTSTRAP_STATUS_REQUESTING_BRIDGE_DESC, 0);
+      }
+    }
+
     circ->cpath->state = CPATH_STATE_AWAITING_KEYS;
     circuit_set_state(TO_CIRCUIT(circ), CIRCUIT_STATE_BUILDING);
     log_info(LD_CIRC,"First hop: finished sending %s cell to '%s'",
@@ -959,7 +967,16 @@ circuit_send_next_onion_skin(origin_circuit_t *circ)
       circuit_reset_failure_count(0);
 
       if (circ->build_state->onehop_tunnel || circ->has_opened) {
-        control_event_bootstrap(BOOTSTRAP_STATUS_REQUESTING_STATUS, 0);
+        /* If we're using bridges, it's only truthful to say that we're
+         * requesting the consensus if we already know enough info about the
+         * bridge to be able to fetch the consensus through it. */
+        if (get_options()->UseBridges) {
+          if (any_bridge_descriptors_known()) {
+            control_event_bootstrap(BOOTSTRAP_STATUS_REQUESTING_STATUS, 0);
+          }
+        } else {
+          control_event_bootstrap(BOOTSTRAP_STATUS_REQUESTING_STATUS, 0);
+        }
       }
 
       pathbias_count_build_success(circ);
