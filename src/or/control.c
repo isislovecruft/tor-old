@@ -5999,6 +5999,10 @@ bootstrap_status_to_string(bootstrap_status_t s, const char **tag,
       *tag = "starting";
       *summary = "Starting";
       break;
+    case BOOTSTRAP_STATUS_REQUESTING_BRIDGE_DESC:
+      *tag = "requesting_bridge_desc";
+      *summary = "Asking for bridge descriptors";
+      break;
     case BOOTSTRAP_STATUS_CONN_DIR:
       *tag = "conn_dir";
       *summary = "Connecting to directory server";

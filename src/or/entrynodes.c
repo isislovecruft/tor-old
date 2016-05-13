@@ -2192,6 +2192,12 @@ fetch_bridge_descriptors(const or_options_t *options, time_t now)
   if (pt_proxies_configuration_pending())
     return;
 
+  /* If we don't know any other bridge descriptors, then signal to controllers
+   * that we're bootstrapping. */
+  if (!any_bridge_descriptors_known()) {
+    control_event_bootstrap(BOOTSTRAP_STATUS_REQUESTING_BRIDGE_DESC, 0);
+  }
+
   SMARTLIST_FOREACH_BEGIN(bridge_list, bridge_info_t *, bridge)
     {
       if (!download_status_is_ready(&bridge->fetch_status, now,

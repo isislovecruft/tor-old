@@ -959,7 +959,16 @@ circuit_send_next_onion_skin(origin_circuit_t *circ)
       circuit_reset_failure_count(0);
 
       if (circ->build_state->onehop_tunnel || circ->has_opened) {
-        control_event_bootstrap(BOOTSTRAP_STATUS_REQUESTING_STATUS, 0);
+        /* If we're using bridges, it's only truthful to say that we're
+         * requesting the consensus if we already know enough info about the
+         * bridge to be able to fetch the consensus through it. */
+        if (get_options()->UseBridges) {
+          if (any_bridge_descriptors_known()) {
+            control_event_bootstrap(BOOTSTRAP_STATUS_REQUESTING_STATUS, 0);
+          }
+        } else {
+          control_event_bootstrap(BOOTSTRAP_STATUS_REQUESTING_STATUS, 0);
+        }
       }
 
       pathbias_count_build_success(circ);
