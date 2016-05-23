@@ -1,0 +1,4 @@
+  o Minor bugfixes (compilation):
+    - Detect libscrypt correctly on systems where libscrypt depends on libm.
+      Fixes bug 19161; bugfix on 0.2.6.1-alpha.
+

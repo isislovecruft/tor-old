@@ -832,7 +832,7 @@ dnl Check for libscrypt
 
 if test "x$enable_libscrypt" != "xno"; then
   AC_CHECK_HEADERS([libscrypt.h])
-  AC_SEARCH_LIBS(libscrypt_scrypt, [scrypt])
+  AC_SEARCH_LIBS(libscrypt_scrypt, [scrypt], , , [-lm])
 fi
 
 dnl ============================================================
