@@ -626,6 +626,7 @@ if test "$TOR_LIB_MATH" = ""; then
   fi
 fi
 AC_SUBST(TOR_LIB_MATH)
+LIBS="$LIBS $TOR_LIB_MATH"
 
 dnl ------------------------------------------------------
 dnl Where do you live, openssl?  And how do we call you?
