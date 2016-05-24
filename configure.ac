@@ -619,6 +619,12 @@ if test "$ac_cv_search_pow" != "none required"; then
     TOR_LIB_MATH="$ac_cv_search_pow"
 fi
 LIBS="$save_LIBS"
+if test "$TOR_LIB_MATH" = ""; then
+  AC_SEARCH_LIBS(log, [m], , AC_MSG_ERROR([Could not find log in libm or libc.]))
+  if test "$ac_cv_search_log" != "none required"; then
+      TOR_LIB_MATH="$ac_cv_search_log"
+  fi
+fi
 AC_SUBST(TOR_LIB_MATH)
 
 dnl ------------------------------------------------------
