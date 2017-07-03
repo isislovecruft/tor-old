@@ -5,7 +5,8 @@ dist: trusty
 before_install:
   - sudo apt-get -qq update
   - sudo apt-get -y install libevent-dev libseccomp2 zlib1g-dev
-  - curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable HOME=src/rust CARGO_TARGET_DIR=src/rust/target
+  - curl https://sh.rustup.rs -Ssf > rustup.sh
+  - HOME=src/rust CARGO_TARGET_DIR=src/rust/target sh rustup.sh -y --default-toolchain stable
   - HOME=src/rust CARGO_TARGET_DIR=src/rust/target rustup default stable 
 
 script: ./autogen.sh && ./configure $RUST_OPTIONS --disable-asciidoc && make test
