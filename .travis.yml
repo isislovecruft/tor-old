@@ -32,8 +32,11 @@ addons:
       - zlib1g-dev
 
 env:
-  - RUST_OPTIONS="--enable-rust --enable-cargo-online-mode"
-  - RUST_OPTIONS=""
+  global:
+    - MAKEFLAGS="-j 2"
+  matrix:
+    - RUST_OPTIONS="--enable-rust --enable-cargo-online-mode"
+    - RUST_OPTIONS=""
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update ; fi
