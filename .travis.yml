@@ -48,7 +48,7 @@ before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then { brew outdated openssl || brew upgrade openssl;    }; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then { brew outdated openssl || brew upgrade libevent;   }; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then { brew outdated openssl || brew upgrade pkg-config; }; fi
-  - curl https://sh.rustup.rs -Ssf > rustup.sh
+  - curl -Ssf -o rustup.sh https://sh.rustup.rs
   - sh rustup.sh -y --default-toolchain nightly
   - source $HOME/.cargo/env
   - which rustc
