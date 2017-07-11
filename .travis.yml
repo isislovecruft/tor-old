@@ -1,5 +1,12 @@
 language: c
-dist: trusty
+
+os:
+  - linux
+  - osx
+
+compiler:
+  - gcc
+  - clang
 
 addons:
   apt:
@@ -9,6 +16,8 @@ addons:
       - zlib1g-dev
 
 before_install:
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install libevent-dev libseccomp2 zlib1g-dev ; fi
   - curl https://sh.rustup.rs -Ssf > rustup.sh
   - sh rustup.sh -y --default-toolchain nightly
   - source $HOME/.cargo/env
