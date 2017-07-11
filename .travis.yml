@@ -7,6 +7,7 @@ before_install:
   - sudo apt-get -y install libevent-dev libseccomp2 zlib1g-dev
   - curl https://sh.rustup.rs -Ssf > rustup.sh
   - sh rustup.sh -y --default-toolchain nightly
+  - source $HOME/.cargo/env
   - which rustc
   - which cargo
   - rustc --version
