@@ -29,6 +29,8 @@ addons:
       - zlib1g-dev
 
 env:
+  global:
+    - MAKEFLAGS="-j 2"
   - RUST_OPTIONS="--enable-rust --enable-cargo-online-mode"
   - RUST_OPTIONS=""
 
