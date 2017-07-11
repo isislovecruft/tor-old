@@ -12,7 +12,7 @@ script: ./autogen.sh && ./configure $RUST_OPTIONS --disable-asciidoc && make tes
 
 matrix:
   include:
-    - env: RUST_OPTIONS="--enable-rust"
+    - env: RUST_OPTIONS="--enable-rust --enable-cargo-online-mode"
     - env: RUST_OPTIONS=""
 
   
