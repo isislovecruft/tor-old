@@ -10,7 +10,7 @@ notifications:
       - "irc.oftc.net#tor-bots"
     template:
       - "%{repository} %{branch} %{commit} - %{author}: %{commit_subject}"
-      - "Build %{build_number} %{result}. Details: %{build_url}"
+      - "Build #%{build_number} %{result}. Details: %{build_url}"
     on_success: change
     on_failure: change
   email:
