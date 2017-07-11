@@ -1,11 +1,5 @@
 language: c
 
-os:
-  - linux
-    dist: trusty
-    sudo: false
-  - osx
-
 compiler:
   - gcc
   - clang
@@ -35,7 +29,15 @@ script:
 
 matrix:
   include:
-    - env: RUST_OPTIONS="--enable-rust --enable-cargo-online-mode"
-    - env: RUST_OPTIONS=""
-
-  
+    - os: linux
+      dist: trusty
+      sudo: false
+      env: RUST_OPTIONS="--enable-rust --enable-cargo-online-mode"
+    - os: linux
+      dist: trusty
+      sudo: false
+      env: RUST_OPTIONS=""
+    - os: osx
+      env: RUST_OPTIONS="--enable-rust --enable-cargo-online-mode"
+    - os: osx
+      env: RUST_OPTIONS=""
