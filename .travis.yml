@@ -38,6 +38,9 @@ env:
     - RUST_OPTIONS="--enable-rust --enable-cargo-online-mode"
     - RUST_OPTIONS=""
 
+matrix:
+  fast_finish: true
+
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update ; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install libevent openssl pkg-config ; fi
