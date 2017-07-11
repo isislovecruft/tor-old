@@ -56,5 +56,6 @@ before_install:
 
 script:
   - ./autogen.sh
-  - ./configure $RUST_OPTIONS --disable-asciidoc
+  - ./configure $RUST_OPTIONS --disable-asciidoc --enable-fatal-warnings
+  - make check-spaces
   - make test
