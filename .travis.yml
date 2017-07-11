@@ -19,7 +19,9 @@ notifications:
 
 os:
   - linux
-  - osx
+  ## Uncomment the following line to also run the entire build matrix on OSX.
+  ## This will make your CI builds take roughly ten times longer to finish.
+  # - osx
 
 dist: trusty
 sudo: false
