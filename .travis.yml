@@ -14,6 +14,9 @@ notifications:
     on_success: always
     on_failure: always
 
+dist: trusty
+sudo: false
+
 addons:
   apt:
     packages:
@@ -44,6 +47,4 @@ env:
 matrix:
   include:
     - os: linux
-      dist: trusty
-      sudo: false
     - os: osx
