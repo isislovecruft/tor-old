@@ -14,6 +14,10 @@ notifications:
     on_success: always
     on_failure: always
 
+os:
+  - linux
+  - osx
+
 dist: trusty
 sudo: false
 
@@ -23,6 +27,10 @@ addons:
       - libevent-dev
       - libseccomp2
       - zlib1g-dev
+
+env:
+  - RUST_OPTIONS="--enable-rust --enable-cargo-online-mode"
+  - RUST_OPTIONS=""
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update ; fi
@@ -39,12 +47,3 @@ script:
   - ./autogen.sh
   - ./configure $RUST_OPTIONS --disable-asciidoc
   - make test
-
-env:
-  - RUST_OPTIONS="--enable-rust --enable-cargo-online-mode"
-  - RUST_OPTIONS=""
-
-matrix:
-  include:
-    - os: linux
-    - os: osx
