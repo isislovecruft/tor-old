@@ -11,7 +11,10 @@ before_install:
   - rustup which cargo
   - rustup show
 
-script: ./autogen.sh && ./configure $RUST_OPTIONS --disable-asciidoc && make test
+script:
+  - ./autogen.sh
+  - ./configure $RUST_OPTIONS --disable-asciidoc
+  - make test
 
 matrix:
   include:
