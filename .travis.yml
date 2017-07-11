@@ -60,5 +60,4 @@ script:
   - ./autogen.sh
   - ./configure $RUST_OPTIONS --disable-asciidoc --enable-fatal-warnings
   - make check-spaces
-  - make test-full-online
-  - make distcheck
+  - make test
