@@ -1,10 +1,12 @@
 language: c
-sudo: enabled
 dist: trusty
 
-before_install:
-  - sudo apt-get -qq update
-  - sudo apt-get -y install libevent-dev libseccomp2 zlib1g-dev
+addons:
+  apt:
+    packages:
+      - libevent-dev
+      - libseccomp2
+      - zlib1g-dev
 
 script:
   - ./autogen.sh
