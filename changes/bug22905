@@ -1,0 +1,4 @@
+ o Minor bugfixes:
+   - Fix a bug where src/rust/Cargo.lock and src/rust/tor_util/Cargo.toml
+     specified mismatched versions for the Rust libc crate dependency.  Fixes
+     bug 22905; fix by Chelsea Komlo.  Bugfix on 0.3.1.1-alpha.
