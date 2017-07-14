@@ -1136,6 +1136,61 @@ init_mock_ed_keys(const crypto_pk_t *rsa_identity_key)
 #undef MAKECERT
 #endif
 
+/**
+ * Log when a <b>key</b> with some <b>description</b> and stored in a
+ * file named <b>fname</b> is going to expire.
+ */
+static void
+log_ed_key_expiration(const tor_cert_t *key,
+                      const char *description,
+                      const char *fname) {
+  char *buf = NULL;
+
+  if (BUG(!key)) { /* If the specified key hasn't been loaded */
+    log_warn(LD_OR, "No %s key loaded; can't get key expiration.", description);
+  } else {
+    buf = tor_malloc(ISO_TIME_LEN+1);
+    format_local_iso_time(buf, key->valid_until);
+    log_notice(LD_OR, "The %s key stored in %s is valid until %s.",
+               description, fname, buf);
+  }
+
+  tor_free(buf);
+}
+
+/**
+ * Log when our master signing key expires.  Used when tor is given
+ * the --key-expiration command-line option.
+ *
+ * Returns 0 on success and 1 on failure;
+ */
+int
+log_master_signing_key_expiration(const or_options_t *options) {
+  const tor_cert_t *signing_key;
+  char *fn = NULL;
+  int failed = 0;
+
+  fn = options_get_datadir_fname2(options, "keys", "ed25519_signing_cert");
+
+  /* Try to grab our cached copy of the key. */
+  signing_key = get_master_signing_key_cert();
+
+  /* Load our keys from disk, if necessary. */
+  if (!signing_key) {
+    failed = load_ed_keys(options, time(NULL)) < 0;
+    signing_key = get_master_signing_key_cert();
+  }
+
+  /* If we do have a signing key, log the expiration time. */
+  if (signing_key) {
+    log_ed_key_expiration(signing_key, "signing", fn);
+  }
+
+  tor_free(fn);
+
+  return failed;
+}
+
 const ed25519_public_key_t *
 get_master_identity_key(void)
 {
