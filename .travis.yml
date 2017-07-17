@@ -58,6 +58,10 @@ before_install:
 
 script:
   - ./autogen.sh
-  - ./configure $RUST_OPTIONS --disable-asciidoc --enable-fatal-warnings
-  - make check-spaces
-  - make test
+  - ./configure $RUST_OPTIONS --disable-asciidoc --enable-fatal-warnings --disable-silent-rules
+  ## We run `make check` because that's what https://jenkins.torproject.org does.
+  - make check
+
+after_failure:
+  ## `make check` will leave a log file with more details of test failures.
+  - cat test-suite.log
