@@ -1144,18 +1144,16 @@ static void
 log_ed_key_expiration(const tor_cert_t *key,
                       const char *description,
                       const char *fname) {
-  char *buf = NULL;
+  char buf[ISO_TIME_LEN+1];
 
   if (BUG(!key)) { /* If the specified key hasn't been loaded */
-    log_warn(LD_OR, "No %s key loaded; can't get key expiration.", description);
+    log_warn(LD_OR, "No %s key loaded; can't get key expiration.",
+             description);
   } else {
-    buf = tor_malloc(ISO_TIME_LEN+1);
     format_local_iso_time(buf, key->valid_until);
     log_notice(LD_OR, "The %s key stored in %s is valid until %s.",
                description, fname, buf);
   }
-
-  tor_free(buf);
 }
 
 /**
