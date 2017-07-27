@@ -1137,6 +1137,20 @@ init_mock_ed_keys(const crypto_pk_t *rsa_identity_key)
 #endif
 
 /**
+ * Print the ISO8601-formated <b>expiration</b> for a certificate with
+ * some <b>description</b> to stdout.
+ *
+ * For example, for a signing certificate, this might print out:
+ * signing-cert-expiry: 2017-07-25 08:30:15 UTC
+ */
+static void
+print_cert_expiration(const char *expiration,
+                      const char *description)
+{
+  fprintf(stdout, "%s-cert-expiry: %s\n", description, expiration);
+}
+
+/**
  * Log when a certificate, <b>cert</b>, with some <b>description</b> and
  * stored in a file named <b>fname</b>, is going to expire.
  */
@@ -1153,6 +1167,7 @@ log_ed_cert_expiration(const tor_cert_t *cert,
     format_local_iso_time(expiration, cert->valid_until);
     log_notice(LD_OR, "The %s certificate stored in %s is valid until %s.",
                description, fname, expiration);
+    print_cert_expiration(expiration, description);
   }
 }
 
