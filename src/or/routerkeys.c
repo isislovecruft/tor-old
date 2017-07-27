@@ -1137,30 +1137,30 @@ init_mock_ed_keys(const crypto_pk_t *rsa_identity_key)
 #endif
 
 /**
- * Log when a <b>key</b> with some <b>description</b> and stored in a
- * file named <b>fname</b> is going to expire.
+ * Log when a certificate, <b>cert</b>, with some <b>description</b> and
+ * stored in a file named <b>fname</b>, is going to expire.
  */
 static void
-log_ed_key_expiration(const tor_cert_t *key,
-                      const char *description,
-                      const char *fname) {
-  char buf[ISO_TIME_LEN+1];
+log_ed_cert_expiration(const tor_cert_t *cert,
+                       const char *description,
+                       const char *fname) {
+  char expiration[ISO_TIME_LEN+1];
 
-  if (BUG(!key)) { /* If the specified key hasn't been loaded */
-    log_warn(LD_OR, "No %s key loaded; can't get key expiration.",
+  if (BUG(!cert)) { /* If the specified key hasn't been loaded */
+    log_warn(LD_OR, "No %s key loaded; can't get certificate expiration.",
              description);
   } else {
-    format_local_iso_time(buf, key->valid_until);
-    log_notice(LD_OR, "The %s key stored in %s is valid until %s.",
-               description, fname, buf);
+    format_local_iso_time(expiration, cert->valid_until);
+    log_notice(LD_OR, "The %s certificate stored in %s is valid until %s.",
+               description, fname, expiration);
   }
 }
 
 /**
- * Log when our master signing key expires.  Used when tor is given
+ * Log when our master signing key certificate expires.  Used when tor is given
  * the --key-expiration command-line option.
  *
- * Returns 0 on success and 1 on failure;
+ * Returns 0 on success and 1 on failure.
  */
 int
 log_master_signing_key_expiration(const or_options_t *options) {
@@ -1181,7 +1181,7 @@ log_master_signing_key_expiration(const or_options_t *options) {
 
   /* If we do have a signing key, log the expiration time. */
   if (signing_key) {
-    log_ed_key_expiration(signing_key, "signing", fn);
+    log_ed_cert_expiration(signing_key, "signing", fn);
   }
 
   tor_free(fn);
