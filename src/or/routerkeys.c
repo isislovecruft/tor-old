@@ -1178,7 +1178,8 @@ log_ed_cert_expiration(const tor_cert_t *cert,
  * Returns 0 on success and 1 on failure.
  */
 int
-log_master_signing_key_expiration(const or_options_t *options) {
+log_master_signing_key_expiration(const or_options_t *options)
+{
   const tor_cert_t *signing_key;
   char *fn = NULL;
   int failed = 0;
