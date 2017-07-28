@@ -2137,7 +2137,7 @@ static const struct {
   { "--dump-config",          ARGUMENT_OPTIONAL },
   { "--list-fingerprint",     TAKES_NO_ARGUMENT },
   { "--keygen",               TAKES_NO_ARGUMENT },
-  { "--key-expiration",       TAKES_NO_ARGUMENT },
+  { "--key-expiration",       ARGUMENT_OPTIONAL },
   { "--newpass",              TAKES_NO_ARGUMENT },
   { "--no-passphrase",        TAKES_NO_ARGUMENT },
   { "--passphrase-fd",        ARGUMENT_NECESSARY },
@@ -4935,6 +4935,7 @@ options_init_from_torrc(int argc, char **argv)
       command = CMD_KEYGEN;
     } else if (!strcmp(p_index->key, "--key-expiration")) {
       command = CMD_KEY_EXPIRATION;
+      command_arg = p_index->value;
     } else if (!strcmp(p_index->key,"--list-fingerprint")) {
       command = CMD_LIST_FINGERPRINT;
     } else if (!strcmp(p_index->key, "--hash-password")) {

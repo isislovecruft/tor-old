@@ -1177,8 +1177,8 @@ log_ed_cert_expiration(const tor_cert_t *cert,
  *
  * Returns 0 on success and 1 on failure.
  */
-int
-log_master_signing_key_expiration(const or_options_t *options)
+static int
+log_master_signing_key_cert_expiration(const or_options_t *options)
 {
   const tor_cert_t *signing_key;
   char *fn = NULL;
@@ -1198,11 +1198,41 @@ log_master_signing_key_expiration(const or_options_t *options)
   /* If we do have a signing key, log the expiration time. */
   if (signing_key) {
     log_ed_cert_expiration(signing_key, "signing", fn);
+  } else {
+    log_warn(LD_OR, "Could not load signing key certificate from %s, so " \
+             "we couldn't learn anything about certificate expiration.", fn);
   }
 
   tor_free(fn);
 
   return failed;
+}
+
+/**
+ * Log when a key certificate expires.  Used when tor is given the
+ * --key-expiration command-line option.
+ *
+ * If an command argument is given, which should specify the type of
+ * key to get expiry information about (currently supported arguments
+ * are "sign"), get info about that type of certificate.  Otherwise,
+ * print info about the supported arguments.
+ *
+ * Returns 0 on success and 1 on failure.
+ */
+int
+log_cert_expiration(void)
+{
+  const or_options_t *options = get_options();
+  const char *arg = options->command_arg;
+
+  if (!strcmp(arg, "sign")) {
+    return log_master_signing_key_cert_expiration(options);
+  } else {
+    fprintf(stderr, "No valid argument to --key-expiration found!\n");
+    fprintf(stderr, "Currently recognised arguments are: 'sign'\n");
+
+    return 1;
+  }
 }
 
 const ed25519_public_key_t *
