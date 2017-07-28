@@ -1183,15 +1183,18 @@ log_master_signing_key_cert_expiration(const or_options_t *options)
   const tor_cert_t *signing_key;
   char *fn = NULL;
   int failed = 0;
+  time_t now = approx_time();
 
   fn = options_get_datadir_fname2(options, "keys", "ed25519_signing_cert");
 
   /* Try to grab our cached copy of the key. */
   signing_key = get_master_signing_key_cert();
 
+  tor_assert(server_identity_key_is_set());
+
   /* Load our keys from disk, if necessary. */
   if (!signing_key) {
-    failed = load_ed_keys(options, time(NULL)) < 0;
+    failed = load_ed_keys(options, now) < 0;
     signing_key = get_master_signing_key_cert();
   }
 
@@ -1217,7 +1220,7 @@ log_master_signing_key_cert_expiration(const or_options_t *options)
  * are "sign"), get info about that type of certificate.  Otherwise,
  * print info about the supported arguments.
  *
- * Returns 0 on success and 1 on failure.
+ * Returns 0 on success and -1 on failure.
  */
 int
 log_cert_expiration(void)
@@ -1231,7 +1234,7 @@ log_cert_expiration(void)
     fprintf(stderr, "No valid argument to --key-expiration found!\n");
     fprintf(stderr, "Currently recognised arguments are: 'sign'\n");
 
-    return 1;
+    return -1;
   }
 }
 

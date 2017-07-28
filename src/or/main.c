@@ -3759,7 +3759,9 @@ tor_main(int argc, char *argv[])
     result = load_ed_keys(get_options(), time(NULL)) < 0;
     break;
   case CMD_KEY_EXPIRATION:
+    init_keys();
     result = log_cert_expiration();
+    result = 0;
     break;
   case CMD_LIST_FINGERPRINT:
     result = do_list_fingerprint();
