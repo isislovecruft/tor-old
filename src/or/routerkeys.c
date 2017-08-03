@@ -1147,7 +1147,7 @@ static void
 print_cert_expiration(const char *expiration,
                       const char *description)
 {
-  fprintf(stdout, "%s-cert-expiry: %s\n", description, expiration);
+  fprintf(stderr, "%s-cert-expiry: %s\n", description, expiration);
 }
 
 /**
