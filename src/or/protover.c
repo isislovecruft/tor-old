@@ -27,67 +27,25 @@
 #include "protover.h"
 #include "routerparse.h"
 
-static const smartlist_t *get_supported_protocol_list(void);
-static int protocol_list_contains(const smartlist_t *protos,
-                                  protocol_type_t pr, uint32_t ver);
-
-/** Mapping between protocol type string and protocol type. */
-static const struct {
-  protocol_type_t protover_type;
-  const char *name;
-} PROTOCOL_NAMES[] = {
-  { PRT_LINK, "Link" },
-  { PRT_LINKAUTH, "LinkAuth" },
-  { PRT_RELAY, "Relay" },
-  { PRT_DIRCACHE, "DirCache" },
-  { PRT_HSDIR, "HSDir" },
-  { PRT_HSINTRO, "HSIntro" },
-  { PRT_HSREND, "HSRend" },
-  { PRT_DESC, "Desc" },
-  { PRT_MICRODESC, "Microdesc"},
-  { PRT_CONS, "Cons" }
-};
-
-#define N_PROTOCOL_NAMES ARRAY_LENGTH(PROTOCOL_NAMES)
+/** The protocols from protover_get_supported_protocols(), as parsed into a
+ * list of proto_entry_t values. Access this via
+ * get_supported_protocol_list. */
+static smartlist_t *supported_protocol_list = NULL;
 
 /**
- * Given a protocol_type_t, return the corresponding string used in
- * descriptors.
+ * Release all storage held by static fields in protover.c
  */
-STATIC const char *
-protocol_type_to_str(protocol_type_t pr)
+void
+protover_free_all(void)
 {
-  unsigned i;
-  for (i=0; i < N_PROTOCOL_NAMES; ++i) {
-    if (PROTOCOL_NAMES[i].protover_type == pr)
-      return PROTOCOL_NAMES[i].name;
+  if (supported_protocol_list) {
+    smartlist_t *entries = supported_protocol_list;
+    SMARTLIST_FOREACH(entries, proto_entry_t *, ent, proto_entry_free(ent));
+    smartlist_free(entries);
+    supported_protocol_list = NULL;
   }
-  /* LCOV_EXCL_START */
-  tor_assert_nonfatal_unreached_once();
-  return "UNKNOWN";
-  /* LCOV_EXCL_STOP */
 }
 
-/**
- * Given a string, find the corresponding protocol type and store it in
- * <b>pr_out</b>. Return 0 on success, -1 on failure.
- */
-STATIC int
-str_to_protocol_type(const char *s, protocol_type_t *pr_out)
-{
-  if (BUG(!pr_out))
-    return -1;
-
-  unsigned i;
-  for (i=0; i < N_PROTOCOL_NAMES; ++i) {
-    if (0 == strcmp(s, PROTOCOL_NAMES[i].name)) {
-      *pr_out = PROTOCOL_NAMES[i].protover_type;
-      return 0;
-    }
-  }
-
-  return -1;
-}
 
 /**
  * Release all space held by a single proto_entry_t structure
@@ -247,6 +205,118 @@ parse_protocol_list(const char *s)
   return NULL;
 }
 
+/** Given a list of space-separated proto_entry_t items,
+ * encode it into a newly allocated space-separated string. */
+STATIC char *
+encode_protocol_list(const smartlist_t *sl)
+{
+  const char *separator = "";
+  smartlist_t *chunks = smartlist_new();
+  SMARTLIST_FOREACH_BEGIN(sl, const proto_entry_t *, ent) {
+    smartlist_add_strdup(chunks, separator);
+
+    proto_entry_encode_into(chunks, ent);
+
+    separator = " ";
+  } SMARTLIST_FOREACH_END(ent);
+
+  char *result = smartlist_join_strings(chunks, "", 0, NULL);
+
+  SMARTLIST_FOREACH(chunks, char *, cp, tor_free(cp));
+  smartlist_free(chunks);
+
+  return result;
+}
+
+/**
+ * Given a protocol entry, encode it at the end of the smartlist <b>chunks</b>
+ * as one or more newly allocated strings.
+ */
+STATIC void
+proto_entry_encode_into(smartlist_t *chunks, const proto_entry_t *entry)
+{
+  smartlist_add_asprintf(chunks, "%s=", entry->name);
+
+  SMARTLIST_FOREACH_BEGIN(entry->ranges, proto_range_t *, range) {
+    const char *comma = "";
+    if (range_sl_idx != 0)
+      comma = ",";
+
+    if (range->low == range->high) {
+      smartlist_add_asprintf(chunks, "%s%lu",
+                             comma, (unsigned long)range->low);
+    } else {
+      smartlist_add_asprintf(chunks, "%s%lu-%lu",
+                             comma, (unsigned long)range->low,
+                             (unsigned long)range->high);
+    }
+  } SMARTLIST_FOREACH_END(range);
+}
+
+
+#ifndef HAVE_RUST
+static const smartlist_t *get_supported_protocol_list(void);
+static int protocol_list_contains(const smartlist_t *protos,
+                                  protocol_type_t pr, uint32_t ver);
+
+/** Mapping between protocol type string and protocol type. */
+static const struct {
+  protocol_type_t protover_type;
+  const char *name;
+} PROTOCOL_NAMES[] = {
+  { PRT_LINK, "Link" },
+  { PRT_LINKAUTH, "LinkAuth" },
+  { PRT_RELAY, "Relay" },
+  { PRT_DIRCACHE, "DirCache" },
+  { PRT_HSDIR, "HSDir" },
+  { PRT_HSINTRO, "HSIntro" },
+  { PRT_HSREND, "HSRend" },
+  { PRT_DESC, "Desc" },
+  { PRT_MICRODESC, "Microdesc"},
+  { PRT_CONS, "Cons" }
+};
+
+#define N_PROTOCOL_NAMES ARRAY_LENGTH(PROTOCOL_NAMES)
+
+/**
+ * Given a protocol_type_t, return the corresponding string used in
+ * descriptors.
+ */
+STATIC const char *
+protocol_type_to_str(protocol_type_t pr)
+{
+  unsigned i;
+  for (i=0; i < N_PROTOCOL_NAMES; ++i) {
+    if (PROTOCOL_NAMES[i].protover_type == pr)
+      return PROTOCOL_NAMES[i].name;
+  }
+  /* LCOV_EXCL_START */
+  tor_assert_nonfatal_unreached_once();
+  return "UNKNOWN";
+  /* LCOV_EXCL_STOP */
+}
+
+/**
+ * Given a string, find the corresponding protocol type and store it in
+ * <b>pr_out</b>. Return 0 on success, -1 on failure.
+ */
+STATIC int
+str_to_protocol_type(const char *s, protocol_type_t *pr_out)
+{
+  if (BUG(!pr_out))
+    return -1;
+
+  unsigned i;
+  for (i=0; i < N_PROTOCOL_NAMES; ++i) {
+    if (0 == strcmp(s, PROTOCOL_NAMES[i].name)) {
+      *pr_out = PROTOCOL_NAMES[i].protover_type;
+      return 0;
+    }
+  }
+
+  return -1;
+}
+
 /**
  * Given a protocol type and version number, return true iff we know
  * how to speak that protocol.
@@ -298,11 +368,6 @@ protover_get_supported_protocols(void)
     "Relay=1-2";
 }
 
-/** The protocols from protover_get_supported_protocols(), as parsed into a
- * list of proto_entry_t values. Access this via
- * get_supported_protocol_list. */
-static smartlist_t *supported_protocol_list = NULL;
-
 /** Return a pointer to a smartlist of proto_entry_t for the protocols
  * we support. */
 static const smartlist_t *
@@ -313,54 +378,6 @@ get_supported_protocol_list(void)
       parse_protocol_list(protover_get_supported_protocols());
   }
   return supported_protocol_list;
-}
-
-/**
- * Given a protocol entry, encode it at the end of the smartlist <b>chunks</b>
- * as one or more newly allocated strings.
- */
-static void
-proto_entry_encode_into(smartlist_t *chunks, const proto_entry_t *entry)
-{
-  smartlist_add_asprintf(chunks, "%s=", entry->name);
-
-  SMARTLIST_FOREACH_BEGIN(entry->ranges, proto_range_t *, range) {
-    const char *comma = "";
-    if (range_sl_idx != 0)
-      comma = ",";
-
-    if (range->low == range->high) {
-      smartlist_add_asprintf(chunks, "%s%lu",
-                             comma, (unsigned long)range->low);
-    } else {
-      smartlist_add_asprintf(chunks, "%s%lu-%lu",
-                             comma, (unsigned long)range->low,
-                             (unsigned long)range->high);
-    }
-  } SMARTLIST_FOREACH_END(range);
-}
-
-/** Given a list of space-separated proto_entry_t items,
- * encode it into a newly allocated space-separated string. */
-STATIC char *
-encode_protocol_list(const smartlist_t *sl)
-{
-  const char *separator = "";
-  smartlist_t *chunks = smartlist_new();
-  SMARTLIST_FOREACH_BEGIN(sl, const proto_entry_t *, ent) {
-    smartlist_add_strdup(chunks, separator);
-
-    proto_entry_encode_into(chunks, ent);
-
-    separator = " ";
-  } SMARTLIST_FOREACH_END(ent);
-
-  char *result = smartlist_join_strings(chunks, "", 0, NULL);
-
-  SMARTLIST_FOREACH(chunks, char *, cp, tor_free(cp));
-  smartlist_free(chunks);
-
-  return result;
 }
 
 /* We treat any protocol list with more than this many subprotocols in it
@@ -720,18 +737,4 @@ protover_compute_for_old_tor(const char *version)
     return "";
   }
 }
-
-/**
- * Release all storage held by static fields in protover.c
- */
-void
-protover_free_all(void)
-{
-  if (supported_protocol_list) {
-    smartlist_t *entries = supported_protocol_list;
-    SMARTLIST_FOREACH(entries, proto_entry_t *, ent, proto_entry_free(ent));
-    smartlist_free(entries);
-    supported_protocol_list = NULL;
-  }
-}
-
+#endif

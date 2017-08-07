@@ -27,6 +27,7 @@ endif
 
 if USE_RUST
 rust_ldadd=$(top_builddir)/src/rust/target/release/libtor_util.a
+rust_ldadd+=$(top_builddir)/src/rust/target/release/libprotover.a
 else
 rust_ldadd=
 endif

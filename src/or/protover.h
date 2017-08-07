@@ -68,11 +68,17 @@ typedef struct proto_entry_t {
   smartlist_t *ranges;
 } proto_entry_t;
 
-STATIC smartlist_t *parse_protocol_list(const char *s);
 STATIC void proto_entry_free(proto_entry_t *entry);
+
+STATIC smartlist_t *parse_protocol_list(const char *s);
 STATIC char *encode_protocol_list(const smartlist_t *sl);
-STATIC const char *protocol_type_to_str(protocol_type_t pr);
+STATIC void proto_entry_encode_into(smartlist_t *chunks, const proto_entry_t *entry);
+
+#ifndef HAVE_RUST
 STATIC int str_to_protocol_type(const char *s, protocol_type_t *pr_out);
+STATIC const char *protocol_type_to_str(protocol_type_t pr);
+#endif
+
 #endif
 
 #endif

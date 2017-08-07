@@ -182,6 +182,30 @@ test_protover_all_supported(void *arg)
   tor_free(msg);
 }
 
+static void
+test_protover_list_supports_protocol_returns_true(void *arg)
+{
+  (void)arg;
+
+  const char* protos = protover_get_supported_protocols();
+  int is_supported = protocol_list_supports_protocol(protos, PRT_LINK, 1);
+  tt_int_op(is_supported, OP_EQ, 1);
+  done:
+  ;
+}
+
+static void
+test_protover_list_supports_protocol_for_unsupported_returns_false(void *arg)
+{
+  (void)arg;
+
+  const char* protos = protover_get_supported_protocols();
+  int is_supported = protocol_list_supports_protocol(protos, PRT_LINK, 10);
+  tt_int_op(is_supported, OP_EQ, 0);
+  done:
+  ;
+}
+
 #define PV_TEST(name, flags)                       \
   { #name, test_protover_ ##name, (flags), NULL, NULL }
 
@@ -190,6 +214,8 @@ struct testcase_t protover_tests[] = {
   PV_TEST(parse_fail, 0),
   PV_TEST(vote, 0),
   PV_TEST(all_supported, 0),
+  PV_TEST(list_supports_protocol_returns_true, 0),
+  PV_TEST(list_supports_protocol_for_unsupported_returns_false, 0),
   END_OF_TESTCASES
 };
 
