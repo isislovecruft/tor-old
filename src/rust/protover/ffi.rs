@@ -3,7 +3,7 @@ extern crate smartlist;
 
 use self::smartlist::*;
 use std::fmt;
-use self::libc::{c_char, c_int, int32_t};
+use self::libc::{c_char, c_int, c_uint, size_t, uint32_t};
 use std::ffi::CStr;
 use std::ffi::CString;
 
@@ -75,7 +75,7 @@ pub unsafe extern "C" fn protover_all_supported(
 pub unsafe extern "C" fn protocol_list_supports_protocol(
     list: *const c_char,
     tp: ProtocolType,
-    vers: int32_t,
+    vers: uint32_t,
 ) -> c_int {
     if list.is_null() {
         return 1;
@@ -88,7 +88,7 @@ pub unsafe extern "C" fn protocol_list_supports_protocol(
     };
 
     let proto = translate_to_rust(tp);
-    let is_supported = super::list_supports_protocol(r_str, proto, vers);
+    let is_supported = super::protocol_string_supports_protocol(r_str, proto, vers);
 
     return if is_supported { 1 } else { 0 };
 }
@@ -105,7 +105,7 @@ pub unsafe extern "C" fn protover_get_supported_protocols() -> *mut c_char {
 #[no_mangle]
 pub unsafe extern "C" fn protover_compute_vote(
     list: *mut Smartlist,
-    threshold: c_int,
+    threshold: size_t,
 ) -> *mut c_char {
     if list.is_null() {
         return CString::new("").unwrap().into_raw();
@@ -120,7 +120,7 @@ pub unsafe extern "C" fn protover_compute_vote(
 #[no_mangle]
 pub unsafe extern "C" fn protover_is_supported_here(
     pt: ProtocolType,
-    vers: int32_t,
+    vers: uint32_t,
 ) -> c_int {
     let proto = translate_to_rust(pt);
     let is_supported = super::is_supported_here(proto, vers);

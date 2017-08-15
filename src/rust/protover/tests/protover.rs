@@ -147,24 +147,23 @@ fn protover_all_supported_with_mix_of_supported_and_unsupproted() {
 }
 
 #[test]
-fn protover_list_supports_protocol_returns_true_for_single_supported() {
+fn protover_string_supports_protocol_returns_true_for_single_supported() {
     let protocols = "Link=3-4 Cons=1";
     let is_supported =
-        protover::list_supports_protocol(protocols, protover::Proto::Cons, 1);
+        protover::protocol_string_supports_protocol(protocols, protover::Proto::Cons, 1);
     assert_eq!(true, is_supported);
 }
 
 #[test]
-fn protover_list_supports_protocol_returns_false_for_single_unsupported() {
+fn protover_string_supports_protocol_returns_false_for_single_unsupported() {
     let protocols = "Link=3-4 Cons=1";
     let is_supported =
-        protover::list_supports_protocol(protocols, protover::Proto::Cons, 2);
+        protover::protocol_string_supports_protocol(protocols, protover::Proto::Cons, 2);
     assert_eq!(false, is_supported);
 }
 
 /// todo verify this behavior
 #[test]
-#[ignore]
 fn protover_all_supported_with_unexpected_characters() {
     let protocols = "Cons=*-%";
     let (is_supported, unsupported) = protover::all_supported(protocols);
@@ -173,67 +172,60 @@ fn protover_all_supported_with_unexpected_characters() {
 }
 
 #[test]
+#[should_panic(expected = "Not a valid protocol entry")]
 fn protover_compute_vote_returns_empty_for_empty_string() {
-    let protocols = vec![String::from("")];
-    let listed = protover::compute_vote(protocols, 1);
-    assert_eq!("", listed);
+    let listed = protover::compute_vote(&[""], 1);
+    assert_eq!("", listed.unwrap().as_str());
 }
 
 #[test]
 fn protover_compute_vote_returns_single_protocol_for_matching() {
-    let protocols = vec![String::from("Cons=1")];
-    let listed = protover::compute_vote(protocols, 1);
-    assert_eq!("Cons=1", listed);
+    //let protocols = vec![String::from("Cons=1")];
+    let protocols = ["Cons=1"];
+    let listed = protover::compute_vote(&protocols, 1);
+    assert_eq!("Cons=1", listed.unwrap().as_str());
 }
 
 #[test]
 fn protover_compute_vote_returns_two_protocols_for_two_matching() {
-    let protocols = vec![String::from("Link=1 Cons=1")];
-    let listed = protover::compute_vote(protocols, 1);
-    assert_eq!("Cons=1 Link=1", listed);
+    let protocols = ["Link=1 Cons=1"];
+    let listed = protover::compute_vote(&protocols, 1);
+    assert_eq!("Cons=1 Link=1", listed.unwrap().as_str());
 }
 
 #[test]
 fn protover_compute_vote_returns_one_protocol_when_one_out_of_two_matches() {
-    let protocols = vec![String::from("Cons=1 Link=2"), String::from("Cons=1")];
-    let listed = protover::compute_vote(protocols, 2);
-    assert_eq!("Cons=1", listed);
+    let protocols = ["Cons=1 Link=2", "Cons=1"];
+    let listed = protover::compute_vote(&protocols, 2);
+    assert_eq!("Cons=1", listed.unwrap().as_str());
 }
 
 #[test]
 fn protover_compute_vote_returns_protocols_that_it_doesnt_currently_support() {
-    let protocols = vec![String::from("Foo=1 Cons=2"), String::from("Bar=1")];
-    let listed = protover::compute_vote(protocols, 1);
-    assert_eq!("Bar=1 Cons=2 Foo=1", listed);
+    let protocols = ["Foo=1 Cons=2", "Bar=1"];
+    let listed = protover::compute_vote(&protocols, 1);
+    assert_eq!("Bar=1 Cons=2 Foo=1", listed.unwrap().as_str());
 }
 
 #[test]
 fn protover_compute_vote_returns_matching_for_mix() {
-    let protocols = vec![String::from("Link=1-10,500 Cons=1,3-7,8")];
-    let listed = protover::compute_vote(protocols, 1);
-    assert_eq!("Cons=1,3-8 Link=1-10,500", listed);
+    let protocols = ["Link=1-10,500 Cons=1,3-7,8"];
+    let listed = protover::compute_vote(&protocols, 1);
+    assert_eq!("Cons=1,3-8 Link=1-10,500", listed.unwrap().as_str());
 }
 
 #[test]
 fn protover_compute_vote_returns_matching_for_longer_mix() {
-    let protocols = vec![
-        String::from("Desc=1-10,500 Cons=1,3-7,8"),
-        String::from("Link=123-456,78 Cons=2-6,8 Desc=9"),
-    ];
-
-    let listed = protover::compute_vote(protocols, 1);
-    assert_eq!("Cons=1-8 Desc=1-10,500 Link=78,123-456", listed);
+    let protocols = ["Desc=1-10,500 Cons=1,3-7,8", "Link=123-456,78 Cons=2-6,8 Desc=9"];
+    let listed = protover::compute_vote(&protocols, 1);
+    assert_eq!("Cons=1-8 Desc=1-10,500 Link=78,123-456", listed.unwrap().as_str());
 }
 
 #[test]
 fn protover_compute_vote_returns_matching_for_longer_mix_with_threshold_two() {
-    let protocols = vec![
-        String::from("Desc=1-10,500 Cons=1,3-7,8"),
-        String::from("Link=123-456,78 Cons=2-6,8 Desc=9"),
-    ];
-
-    let listed = protover::compute_vote(protocols, 2);
-    assert_eq!("Cons=3-6,8 Desc=9", listed);
+    let protocols = ["Desc=1-10,500 Cons=1,3-7,8", "Link=123-456,78 Cons=2-6,8 Desc=9"];
+    let listed = protover::compute_vote(&protocols, 2);
+    assert_eq!("Cons=3-6,8 Desc=9", listed.unwrap().as_str());
 }
 
 #[test]
