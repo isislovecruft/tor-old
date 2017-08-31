@@ -438,32 +438,32 @@ Here are some additional bits of advice and rules:
 
    Some cases which you MUST NOT do include:
 
-       * Casting an `u128` down to an `f32` or vice versa (e.g.
-         `u128::MAX as f32` but this isn't only a problem with overflowing
-         as it is also undefined behaviour for `42.0f32 as u128`),
+   * Casting an `u128` down to an `f32` or vice versa (e.g.
+     `u128::MAX as f32` but this isn't only a problem with overflowing
+     as it is also undefined behaviour for `42.0f32 as u128`),
 
-       * Casting between integers and floats when the thing being cast
-         cannot fit into the type it is being casted into, e.g.:
+   * Casting between integers and floats when the thing being cast
+     cannot fit into the type it is being casted into, e.g.:
 
-            println!("{}", 42949.0f32 as u8); // prints 197 in debug mode and 0 in release
-            println!("{}", 1.04E+17 as u8);   // prints 0 in both modes
-            println!("{}", (0.0/0.0) as i64); // prints whatever the heck LLVM wants
+         println!("{}", 42949.0f32 as u8); // prints 197 in debug mode and 0 in release
+         println!("{}", 1.04E+17 as u8);   // prints 0 in both modes
+         println!("{}", (0.0/0.0) as i64); // prints whatever the heck LLVM wants
 
-         Because this behaviour is undefined, it can even produce segfaults in
-         safe Rust code.  For example, the following program built in release
-         mode segfaults:
+     Because this behaviour is undefined, it can even produce segfaults in
+     safe Rust code.  For example, the following program built in release
+     mode segfaults:
 
-            #[inline(never)]
-            pub fn trigger_ub(sl: &[u8; 666]) -> &[u8] {
-                // Note that the float is out of the range of `usize`, invoking UB when casting.
-                let idx = 1e99999f64 as usize;
-                &sl[idx..] // The bound check is elided due to `idx` being of an undefined value.
-            }
+         #[inline(never)]
+         pub fn trigger_ub(sl: &[u8; 666]) -> &[u8] {
+             // Note that the float is out of the range of `usize`, invoking UB when casting.
+             let idx = 1e99999f64 as usize;
+             &sl[idx..] // The bound check is elided due to `idx` being of an undefined value.
+         }
 
-            fn main() {
-                println!("{}", trigger_ub(&[1; 666])[999999]); // ~ out of bound
-            }
+         fn main() {
+             println!("{}", trigger_ub(&[1; 666])[999999]); // ~ out of bound
+         }
 
-         And in debug mode panics with:
+      And in debug mode panics with:
 
-            thread 'main' panicked at 'slice index starts at 140721821254240 but ends at 666', /checkout/src/libcore/slice/mod.rs:754:4
+         thread 'main' panicked at 'slice index starts at 140721821254240 but ends at 666', /checkout/src/libcore/slice/mod.rs:754:4
