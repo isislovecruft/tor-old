@@ -6387,7 +6387,7 @@ check_bridge_distribution_setting(const char *bd)
 
   const char *cp = bd;
   //  Method = (KeywordChar | "_") +
-  while (TOR_ISALNUM(*cp) || *cp == '-' || *cp == '_')
+  while (TOR_ISALNUM(*cp) || *cp == '_')
     ++cp;
 
   if (*cp == 0) {
