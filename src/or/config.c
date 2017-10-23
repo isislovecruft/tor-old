@@ -3348,8 +3348,7 @@ options_validate(or_options_t *old_options, or_options_t *options,
   }
 
   if (options->BridgeDistribution && !options->BridgeRelay) {
-    REJECT("You have set BridgeDistribution yet you didn't set BridgeRelay! "
-           "You cannot set one without the other.");
+    REJECT("You have set BridgeDistribution, yet you didn't set BridgeRelay!");
   }
 
   if (options->MinUptimeHidServDirectoryV2 < 0) {
