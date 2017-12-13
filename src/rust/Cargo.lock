@@ -1,11 +1,3 @@
-[root]
-name = "tor_util"
-version = "0.0.1"
-dependencies = [
- "libc 0.2.22 (registry+https://github.com/rust-lang/crates.io-index)",
- "tor_allocate 0.0.1",
-]
-
 [[package]]
 name = "external"
 version = "0.0.1"
