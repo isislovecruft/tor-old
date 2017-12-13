@@ -62,7 +62,7 @@ or specifying a local directory.
 
 You'll need the following Rust dependencies (as of this writing):
 
-    libc==0.2.22
+    libc==0.2.34
 
 We vendor our Rust dependencies in a separate repo using
 [cargo-vendor](https://github.com/alexcrichton/cargo-vendor).  To use them, do:
