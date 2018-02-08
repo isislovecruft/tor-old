@@ -8,6 +8,56 @@ use std::ffi::CStr;
 /// A byte-array containing a single NUL byte (`b"\0"`).
 pub const NUL_BYTE: &'static [u8] = b"\0";
 
+/// Determine whether a byte slice has intermediate NUL bytes.
+///
+/// # Returns
+///
+/// * `true` if there are no NUL bytes in `bytes` (disregarding the final byte).
+/// * `false` if there are intermediate NUL bytes.
+///
+/// # Panics
+///
+/// If the byte slice is empty.
+///
+/// # Examples
+///
+/// ```
+/// use tor_util::strings::no_intermediate_nul_bytes;
+///
+/// assert!(no_intermediate_nul_bytes(b"o/ waving not drowning") == true);
+/// assert!(no_intermediate_nul_bytes(b"\0 drowning not waving") == false);
+/// ```
+pub fn no_intermediate_nul_bytes(bytes: &[u8]) -> bool {
+    debug_assert!(!bytes.is_empty());
+
+    !bytes[..bytes.len() - 1].contains(&0x00)
+}
+
+/// Determine whether a byte slice is terminated with a NUL byte.
+///
+/// # Returns
+///
+/// * `true` if `bytes` is terminated with a NUL byte.
+/// * `false` if it is not.
+///
+/// # Panics
+///
+/// If the byte slice is empty.
+///
+/// # Examples
+///
+/// ```
+/// use tor_util::strings::terminated_with_nul_byte;
+///
+/// assert!(terminated_with_nul_byte(b"\0") == true);
+/// assert!(terminated_with_nul_byte(b"\0 drowning not waving") == false);
+/// ```
+pub fn terminated_with_nul_byte(bytes: &[u8]) -> bool {
+    debug_assert!(!bytes.is_empty());
+
+    bytes[bytes.len() - 1] == 0x00
+}
+
 /// Determine if a byte slice is a C-like string.
 ///
 /// These checks guarantee that:
@@ -38,10 +88,7 @@ pub const NUL_BYTE: &'static [u8] = b"\0";
 /// assert!(byte_slice_is_c_like(&bytes) == true);
 /// ```
 pub fn byte_slice_is_c_like(bytes: &[u8]) -> bool {
-    if !bytes[..bytes.len() - 1].contains(&0x00) && bytes[bytes.len() - 1] == 0x00 {
-        return true;
-    }
-    false
+    no_intermediate_nul_bytes(bytes) && terminated_with_nul_byte(bytes)
 }
 
 /// Get a static `CStr` containing a single `NUL_BYTE`.
