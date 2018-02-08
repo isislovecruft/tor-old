@@ -127,3 +127,127 @@ pub fn empty_static_cstr() -> &'static CStr {
 
     empty
 }
+
+/// Create a `CStr` from a literal byte slice, appending a NUL byte to it first.
+///
+/// # Warning
+///
+/// The literal byte slice which is taken as an argument _MUST NOT_ have any NUL
+/// bytes (`b"\0"`)in it, anywhere, or absolute wild things will occur when you
+/// try to use the resultant `CStr` in C.  It is *highly* recommended that you
+/// first check your `bytes` using the
+/// `tor_util::strings::no_intermediate_nul_bytes` and
+/// `tor_util::strings::terminated_with_nul_byte` functions provided.
+///
+/// # Examples
+///
+/// ```
+/// #[macro_use]
+/// extern crate tor_util;
+///
+/// use std::ffi::CStr;
+///
+/// use tor_util::strings::no_intermediate_nul_bytes;
+/// use tor_util::strings::terminated_with_nul_byte;
+///
+/// # fn do_test() -> Result<&'static CStr, &'static str> {
+/// let message: &'static str = "This is a test of the tsunami warning system.";
+/// let tuesday: &'static CStr;
+/// let original: &str;
+///
+/// debug_assert!(no_intermediate_nul_bytes(message.as_bytes()));
+/// debug_assert!(!terminated_with_nul_byte(message.as_bytes()));
+///
+/// tuesday = cstr!("This is a test of the tsunami warning system.");
+/// original = tuesday.to_str().or(Err("Couldn't unwrap CStr!"))?;
+///
+/// assert!(original == message);
+/// #
+/// # Ok(tuesday)
+/// # }
+/// # fn main() {
+/// #     do_test();  // so that we can use the ? operator in the test
+/// # }
+/// ```
+///
+/// It is also possible to pass several string literals to this macro.  They
+/// will be concatenated together in the order of the arguments, unmodified,
+/// before finally being suffixed with a NUL byte:
+///
+/// ```
+/// #[macro_use]
+/// extern crate tor_util;
+/// #
+/// # use std::ffi::CStr;
+/// #
+/// # fn do_test() -> Result<&'static CStr, &'static str> {
+///
+/// let quux: &'static CStr = cstr!("foo", "bar", "baz");
+/// let orig: &'static str = quux.to_str().or(Err("Couldn't unwrap CStr!"))?;
+///
+/// assert!(orig == "foobarbaz");
+/// # Ok(quux)
+/// # }
+/// # fn main() {
+/// #     do_test();  // so that we can use the ? operator in the test
+/// # }
+/// ```
+///
+/// This is useful for passing static strings to C from Rust FFI code.  To do so
+/// so, use the `.as_ptr()` method on the resulting `&'static CStr` to convert
+/// it to the Rust equivalent of a C `const char*`:
+///
+/// ```
+/// #[macro_use]
+/// extern crate tor_util;
+///
+/// use std::ffi::CStr;
+/// use std::os::raw::c_char;
+///
+/// pub extern "C" fn give_static_borrowed_string_to_c() -> *const c_char {
+///     let hello: &'static CStr = cstr!("Hello, language my parents wrote.");
+///
+///     hello.as_ptr()
+/// }
+/// # fn main() {
+/// #     let greetings = give_static_borrowed_string_to_c();
+/// # }
+/// ```
+///
+/// Note that the C code this static borrowed string is passed to _MUST NOT_
+/// attempt to free the memory for the string.
+///
+/// # Note
+///
+/// An unfortunate limitation of the rustc compiler (as of 1.25.0-nightly), is
+/// that the above code compiles, however if we were to change the assignment of
+/// `tuesday` as follows, it will fail to compile:
+///
+/// ```ignore
+/// tuesday = cstr!(message);
+/// ```
+///
+/// with the error message `error: expected a literal`.
+#[macro_export]
+macro_rules! cstr {
+    ($($bytes:expr),*) => (
+        unsafe {
+            ::std::ffi::CStr::from_bytes_with_nul_unchecked(concat!($($bytes),*, "\0").as_bytes())
+        }
+    )
+}
+
+#[cfg(test)]
+mod test {
+    use std::ffi::CStr;
+
+    #[test]
+    fn cstr_macro() {
+        let _spooky: &'static CStr = cstr!("boo");
+    }
+
+    #[test]
+    fn cstr_macro_multi_input() {
+        let _quux: &'static CStr = cstr!("foo", "bar", "baz");
+    }
+}
