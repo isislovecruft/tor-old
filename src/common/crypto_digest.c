@@ -12,6 +12,7 @@
 
 #include "crypto_digest.h"
 
+#include "compat_openssl.h"
 #include "crypto.h" /* common functions */
 #include "crypto_rsa.h"
 
