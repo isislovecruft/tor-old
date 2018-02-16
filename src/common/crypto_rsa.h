@@ -87,6 +87,16 @@ int crypto_pk_get_hashed_fingerprint(crypto_pk_t *pk, char *fp_out);
 int crypto_pk_base64_encode(const crypto_pk_t *pk, char **priv_out);
 crypto_pk_t *crypto_pk_base64_decode(const char *str, size_t len);
 
+int crypto_pk_obsolete_public_hybrid_encrypt(crypto_pk_t *env, char *to,
+                                    size_t tolen,
+                                    const char *from, size_t fromlen,
+                                    int padding, int force);
+int crypto_pk_obsolete_private_hybrid_decrypt(crypto_pk_t *env, char *to,
+                                     size_t tolen,
+                                     const char *from, size_t fromlen,
+                                     int padding, int warnOnFailure);
+
+
 /* Prototypes for private functions only used by tortls.c, crypto.c, and the
  * unit tests. */
 struct rsa_st;

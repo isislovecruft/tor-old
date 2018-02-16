@@ -3,6 +3,7 @@
 
 #include "orconfig.h"
 #include "crypto.h"
+#include "crypto_rsa.h"
 #include "or.h"
 #include "test.h"
 

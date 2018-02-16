@@ -47,6 +47,8 @@ double fabs(double x);
 #include "compress.h"
 #include "config.h"
 #include "connection_edge.h"
+#include "crypto_curve25519.h"
+#include "crypto_rsa.h"
 #include "geoip.h"
 #include "rendcommon.h"
 #include "rendcache.h"
@@ -61,7 +63,6 @@ double fabs(double x);
 #include "rephist.h"
 #include "routerparse.h"
 #include "statefile.h"
-#include "crypto_curve25519.h"
 #include "onion_ntor.h"
 
 /** Run unit tests for the onion handshake code. */

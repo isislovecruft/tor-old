@@ -29,6 +29,7 @@
 
 #include "or.h"
 #include "config.h"
+#include "crypto_rsa.h"
 #include "onion_tap.h"
 #include "rephist.h"
 
