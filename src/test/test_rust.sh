@@ -1,7 +1,7 @@
 #!/bin/sh
 # Test all Rust crates
 
-crates="protover tor_util smartlist tor_allocate"
+crates="protover tor_util smartlist tor_allocate external crypto"
 
 exitcode=0
 
