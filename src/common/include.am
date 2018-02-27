@@ -3,6 +3,7 @@ noinst_LIBRARIES += \
 	src/common/libor.a \
 	src/common/libor-ctime.a \
 	src/common/libor-crypto.a \
+	src/common/libor-crypto-digest.a \
 	src/common/libor-event.a
 
 if UNITTESTS_ENABLED
@@ -10,6 +11,7 @@ noinst_LIBRARIES += \
 	src/common/libor-testing.a \
 	src/common/libor-ctime-testing.a \
 	src/common/libor-crypto-testing.a \
+	src/common/libor-crypto-digest-testing.a \
 	src/common/libor-event-testing.a
 endif
 
@@ -113,7 +115,6 @@ LIBOR_CRYPTO_A_SRC = \
   src/common/compress_zlib.c	\
   src/common/compress_zstd.c	\
   src/common/crypto.c		\
-  src/common/crypto_digest.c     \
   src/common/crypto_rsa.c     \
   src/common/crypto_openssl_mgt.c    \
   src/common/crypto_pwbox.c     \
@@ -123,6 +124,9 @@ LIBOR_CRYPTO_A_SRC = \
   src/common/crypto_curve25519.c \
   src/common/crypto_ed25519.c
 
+LIBOR_CRYPTO_DIGEST_A_SRC = \
+	src/common/crypto_digest.c
+
 LIBOR_EVENT_A_SRC = \
 	src/common/compat_libevent.c \
 	src/common/procmon.c         \
@@ -130,15 +134,18 @@ LIBOR_EVENT_A_SRC = \
 	src/ext/timeouts/timeout.c
 
 src_common_libor_a_SOURCES = $(LIBOR_A_SRC)
-src_common_libor_crypto_a_SOURCES = $(LIBOR_CRYPTO_A_SRC)
+src_common_libor_crypto_a_SOURCES = $(LIBOR_CRYPTO_A_SRC) $(LIBOR_CRYPTO_DIGEST_A_SRC)
+src_common_libor_crypto_digest_a_SOURCES = $(LIBOR_CRYPTO_DIGEST_A_SRC)
 src_common_libor_event_a_SOURCES = $(LIBOR_EVENT_A_SRC)
 
 src_common_libor_testing_a_SOURCES = $(LIBOR_A_SRC)
-src_common_libor_crypto_testing_a_SOURCES = $(LIBOR_CRYPTO_A_SRC)
+src_common_libor_crypto_testing_a_SOURCES = $(LIBOR_CRYPTO_A_SRC) $(LIBOR_CRYPTO_DIGEST_A_SRC)
+src_common_libor_crypto_digest_testing_a_SOURCES = $(LIBOR_CRYPTO_DIGEST_A_SRC)
 src_common_libor_event_testing_a_SOURCES = $(LIBOR_EVENT_A_SRC)
 
 src_common_libor_testing_a_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_CPPFLAGS)
 src_common_libor_crypto_testing_a_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_CPPFLAGS)
+src_common_libor_crypto_digest_testing_a_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_CPPFLAGS)
 src_common_libor_event_testing_a_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_CPPFLAGS)
 src_common_libor_testing_a_CFLAGS = $(AM_CFLAGS) $(TEST_CFLAGS)
 src_common_libor_crypto_testing_a_CFLAGS = $(AM_CFLAGS) $(TEST_CFLAGS)

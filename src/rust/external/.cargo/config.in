@@ -1,0 +1,7 @@
+# Additional linker instructions for finding local, non-installed libraries
+
+[target.x86_64-unknown-linux-gnu.or-crypto-digest]
+root = "@BUILDDIR@"
+rustc-link-search = ["native=@BUILDDIR@/src/common/", "native=@BUILDDIR@/src/or/"]
+rustc-link-lib = ["static=or-crypto-digest", "static=tor"]
+rustc-flags = ["-L@BUILDDIR@/src/common/libor-crypto-digest.a"]

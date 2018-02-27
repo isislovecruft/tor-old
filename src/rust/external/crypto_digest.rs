@@ -123,7 +123,7 @@ type smartlist_t = Stringlist;
 ///
 /// These are kept private because they should be wrapped with Rust to make their usage safer.
 #[allow(dead_code)]
-#[link(name = "or-crypto")]
+#[link(name = "or-crypto-digest", kind = "static")]
 extern "C" {
     fn crypto_digest(digest: *mut c_char, m: *const c_char, len: size_t) -> c_int;
     fn crypto_digest256(digest: *mut c_char, m: *const c_char, len: size_t,

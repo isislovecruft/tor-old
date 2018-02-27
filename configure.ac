@@ -2196,6 +2196,7 @@ AC_CONFIG_FILES([
         src/config/torrc.sample
         src/config/torrc.minimal
         src/rust/.cargo/config
+        src/rust/external/.cargo/config
         scripts/maint/checkOptionDocs.pl
         scripts/maint/updateVersions.pl
 ])

@@ -12,6 +12,7 @@ EXTRA_DIST +=\
 	src/rust/external/crypto_digest.rs \
 	src/rust/external/external.rs \
 	src/rust/external/lib.rs \
+	src/rust/external/.cargo/config.in \
 	src/rust/protover/Cargo.toml \
 	src/rust/protover/ffi.rs \
 	src/rust/protover/lib.rs \

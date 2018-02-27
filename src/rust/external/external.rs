@@ -4,7 +4,6 @@
 use libc::{c_char, c_int};
 use std::ffi::CString;
 
-#[link(name = "tor")]
 extern "C" {
     fn tor_version_as_new_as(
         platform: *const c_char,
