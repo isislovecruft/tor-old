@@ -142,6 +142,12 @@ typedef struct log_severity_list_t {
 /** Callback type used for add_callback_log. */
 typedef void (*log_callback)(int severity, uint32_t domain, const char *msg);
 
+/** Compile-time constants for Tor log levels (used by our Rust code). */
+const int LOG_WARN_ = LOG_WARN; /**< C_RUST_COUPLED: src/rust/tor_log `LOG_WARN_` */
+const int LOG_NOTICE_ = LOG_NOTICE; /**< C_RUST_COUPLED: src/rust/tor_log `LOG_NOTICE_` */
+const log_domain_mask_t LD_GENERAL_ = LD_GENERAL; /**< C_RUST_COUPLED: src/rust/tor_log `LD_GENERAL_` */
+const log_domain_mask_t LD_NET_ = LD_NET; /**< C_RUST_COUPLED: src/rust/tor_log `LD_NET_` */
+
 void init_logging(int disable_startup_queue);
 int parse_log_level(const char *level);
 const char *log_level_to_string(int level);
