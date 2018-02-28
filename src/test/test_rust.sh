@@ -1,20 +1,10 @@
 #!/bin/sh
-# Test all Rust crates
 
-crates="protover tor_util smartlist tor_allocate"
+cd "${abs_top_builddir:-../..}/src/rust"
 
-exitcode=0
+CARGO_TARGET_DIR="$PWD/target"
+CARGO_HOME="$PWD"
+RUSTFLAGS="-L ${PWD%/rust}/or -L ${PWD%/rust}/common -L ${PWD%/rust}/ext/keccak-tiny -L ${PWD%/rust}/ext/ed25519/ref10 -L ${PWD%/rust}/ext/ed25519/donna -L ${PWD%/rust}/trunnel -L ${PWD%/rust}/trace -l static=tor-testing -l static=or-crypto-testing -l static=or-testing -l static=or-ctime-testing -l static=or-event-testing -l static=or-trunnel-testing -l static=or-trace -l static=curve25519_donna -l static=keccak-tiny -l static=ed25519_ref10 -l static=ed25519_donna -l ssl -l crypto -l zstd -l seccomp -lcap -levent -lz -llzma -lsystemd"
+export CARGO_TARGET_DIR CARGO_HOME RUSTFLAGS
 
-set -e
-
-for crate in $crates; do
-    cd "${abs_top_builddir:-../../..}/src/rust"
-    CARGO_TARGET_DIR="${abs_top_builddir:-../../..}/src/rust/target" \
-      CARGO_HOME="${abs_top_builddir:-../../..}/src/rust" \
-      "${CARGO:-cargo}" test ${CARGO_ONLINE-"--frozen"} \
-      --manifest-path "${abs_top_srcdir:-.}/src/rust/${crate}/Cargo.toml" \
-	|| exitcode=1
-    cd -
-done
-
-exit $exitcode
+exec "${CARGO:-cargo}" test ${CARGO_ONLINE-"--frozen"} --all --verbose
