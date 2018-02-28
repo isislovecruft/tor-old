@@ -4,7 +4,7 @@ cd "${abs_top_builddir:-../..}/src/rust"
 
 CARGO_TARGET_DIR="$PWD/target"
 CARGO_HOME="$PWD"
-RUSTFLAGS=
+RUSTFLAGS='@RUSTFLAGS@'
 
 srcdir=${PWD%/rust}
 for d in or common ext/keccak-tiny ext/ed25519/ref10 ext/ed25519/donna trunnel trace; do

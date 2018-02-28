@@ -1018,6 +1018,8 @@ CFLAGS_FWRAPV=
 CFLAGS_ASAN=
 CFLAGS_UBSAN=
 
+RUSTFLAGS=
+
 
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [
 #if !defined(__clang__)
@@ -1070,6 +1072,8 @@ if test "$fragile_hardening" = "yes"; then
     fi
 
 TOR_CHECK_CFLAGS([-fno-omit-frame-pointer])
+
+    RUSTFLAGS="$RUSTFLAGS -Z sanitizer=address"
 fi
 
 CFLAGS_BUGTRAP="$CFLAGS_FTRAPV $CFLAGS_ASAN $CFLAGS_UBSAN"
@@ -2219,6 +2223,8 @@ if test "$enable_coverage" = "yes" && test "$have_clang" = "no"; then
 fi
 
 CPPFLAGS="$CPPFLAGS $TOR_CPPFLAGS_libevent $TOR_CPPFLAGS_openssl $TOR_CPPFLAGS_zlib"
+
+AC_SUBST(RUSTFLAGS)
 
 AC_CONFIG_FILES([
         Doxyfile
