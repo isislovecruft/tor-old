@@ -2235,6 +2235,12 @@ AC_CONFIG_FILES([
         scripts/maint/updateVersions.pl
 ])
 
+AC_CONFIG_FILES([
+        src/test/test_rust.sh
+], [
+	chmod +x src/test/test_rust.sh
+])
+
 if test "x$asciidoc" = "xtrue" && test "$ASCIIDOC" = "none"; then
   regular_mans="doc/tor doc/tor-gencert doc/tor-resolve doc/torify"
   for file in $regular_mans ; do
