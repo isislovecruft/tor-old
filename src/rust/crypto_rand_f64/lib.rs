@@ -9,20 +9,14 @@
 // These are the modules we actually want to export
 pub mod ffi;
 
-pub mod crypto_rand_f64_sign;
+mod crypto_rand_f64_sign;
 pub use crypto_rand_f64_sign::*;
 
-// These modules are only used by external crate tests, but they also contain
-// doc tests, which seem to need access to the functions at a module level.
-//
-// And if I make these module private, I get dead code warnings.
-//
-// TODO: is there a better way?
-pub mod crypto_rand_distribution;
+mod crypto_rand_distribution;
 pub use crypto_rand_distribution::*;
 
-pub mod tolerance_f64;
+mod tolerance_f64;
 pub use tolerance_f64::*;
 
-pub mod limits_f64;
+mod limits_f64;
 pub use limits_f64::*;

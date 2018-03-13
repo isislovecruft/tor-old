@@ -12,8 +12,6 @@
 extern crate crypto_rand_f64;
 
 use crypto_rand_f64::*;
-// TODO: Why does this constant needs to be imported separately?
-use crypto_rand_f64::F64_INTEGER_MAX_AS_U64;
 
 /// Aim for a similar failure probability to test_crypto.c
 /// We use an odd power of two because it produces exact binomial results in
