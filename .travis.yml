@@ -90,8 +90,11 @@ matrix:
     ## longer allows ptrace.
     - compiler: clang
       sudo: required
-    - os: osx
-    - os: osx
+    - compiler: clang
+      sudo: required
+      env: RUST_OPTIONS="--enable-rust" TOR_RUST_DEPENDENCIES=true
+    - compiler: clang
+      sudo: required
       env: RUST_OPTIONS=""
 
 before_install:
