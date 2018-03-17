@@ -122,6 +122,7 @@ uptime-*.json
 # /scripts
 /scripts/maint/checkOptionDocs.pl
 /scripts/maint/updateVersions.pl
+/scripts/cargo_test
 
 # /src/
 /src/Makefile
@@ -206,7 +207,6 @@ uptime-*.json
 /src/test/test-switch-id.exe
 /src/test/test-timers.exe
 /src/test/test_workqueue.exe
-/src/test/test_rust.sh
 
 # /src/test/fuzz
 /src/test/fuzz/fuzz-*

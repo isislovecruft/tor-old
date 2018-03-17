@@ -1,12 +1,15 @@
 #!/bin/sh
 
-cd "${abs_top_builddir:-../..}/src/rust"
+# tor cargo test.
 
-CARGO_TARGET_DIR="$PWD/target"
-CARGO_HOME="$PWD"
+# assume nobody will try to build in a directory containing a single quote.
+
+srcdir='@abs_top_builddir@/src'
+
+CARGO_HOME="$srcdir/rust"
+CARGO_TARGET_DIR="$CARGO_HOME/target"
 RUSTFLAGS='@RUSTFLAGS@'
 
-srcdir=${PWD%/rust}
 for d in or common ext/keccak-tiny ext/ed25519/ref10 ext/ed25519/donna trunnel trace; do
     RUSTFLAGS="$RUSTFLAGS -L $srcdir/$d"
 done
@@ -19,4 +22,4 @@ RUSTFLAGS="$RUSTFLAGS @TOR_ZLIB_LIBS@ @TOR_LIB_MATH@ @TOR_LIBEVENT_LIBS@ @TOR_OP
 
 export CARGO_TARGET_DIR CARGO_HOME RUSTFLAGS
 
-exec "${CARGO:-cargo}" test ${CARGO_ONLINE-"--frozen"} --manifest-path "${abs_top_srcdir:-../..}/src/rust/Cargo.toml" --all --verbose
+exec "${CARGO:-cargo}" test ${CARGO_ONLINE-"--frozen"} "$@"

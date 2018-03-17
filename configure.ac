@@ -2242,9 +2242,9 @@ AC_CONFIG_FILES([
 ])
 
 AC_CONFIG_FILES([
-        src/test/test_rust.sh
+        scripts/cargo_test
 ], [
-	chmod +x src/test/test_rust.sh
+	chmod +x scripts/cargo_test
 ])
 
 if test "x$asciidoc" = "xtrue" && test "$ASCIIDOC" = "none"; then
