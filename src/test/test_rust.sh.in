@@ -19,4 +19,4 @@ RUSTFLAGS="$RUSTFLAGS @TOR_ZLIB_LIBS@ @TOR_LIB_MATH@ @TOR_LIBEVENT_LIBS@ @TOR_OP
 
 export CARGO_TARGET_DIR CARGO_HOME RUSTFLAGS
 
-exec "${CARGO:-cargo}" test ${CARGO_ONLINE-"--frozen"} --all --verbose
+exec "${CARGO:-cargo}" test ${CARGO_ONLINE-"--frozen"} --manifest-path "${abs_top_srcdir:-../..}/src/rust/Cargo.toml" --all --verbose
