@@ -52,6 +52,11 @@
 
 #define raw_assert(x) assert(x) // assert OK
 
+extern LOG_WARN;
+extern LOG_NOTICE;
+extern LD_GENERAL;
+extern LD_NET;
+
 /** Defining compile-time constants for Tor log levels (used by the Rust
  * log wrapper at src/rust/tor_log) */
 const int LOG_WARN_ = LOG_WARN;
