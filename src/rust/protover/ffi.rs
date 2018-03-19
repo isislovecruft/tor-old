@@ -56,19 +56,26 @@ pub extern "C" fn protover_all_supported(
         Err(_) => return 1,
     };
 
-    let (is_supported, unsupported) = all_supported(relay_version);
+    let relay_proto_entry: UnvalidatedProtoEntry = match relay_version.parse() {
+        Ok(n)  => n,
+        Err(_) => return 1,
+    };
+    let maybe_unsupported: Option<UnvalidatedProtoEntry> = relay_proto_entry.all_supported();
 
-    if unsupported.len() > 0 {
-        let c_unsupported = match CString::new(unsupported) {
+    if maybe_unsupported.is_some() {
+        let unsupported: UnvalidatedProtoEntry = maybe_unsupported.unwrap();
+        let c_unsupported: CString = match CString::new(unsupported.to_string()) {
             Ok(n) => n,
             Err(_) => return 1,
         };
 
         let ptr = c_unsupported.into_raw();
         unsafe { *missing_out = ptr };
+
+        return 0;
     }
 
-    return if is_supported { 1 } else { 0 };
+    1
 }
 
 /// Provide an interface for C to translate arguments and return types for
@@ -91,16 +98,18 @@ pub extern "C" fn protocol_list_supports_protocol(
         Ok(n) => n,
         Err(_) => return 1,
     };
-
-    let protocol = match translate_to_rust(c_protocol) {
-        Ok(n) => n,
+    let proto_entry: UnvalidatedProtoEntry = match protocol_list.parse() {
+        Ok(n)  => n,
         Err(_) => return 0,
     };
-
-    let is_supported =
-        protover_string_supports_protocol(protocol_list, protocol, version);
-
-    return if is_supported { 1 } else { 0 };
+    let protocol: UnknownProtocol = match translate_to_rust(c_protocol) {
+        Ok(n) => n.into(),
+        Err(_) => return 0,
+    };
+    match proto_entry.supports_protocol(&protocol, &version) {
+        false => return 0,
+        true  => return 1,
+    }
 }
 
 /// Provide an interface for C to translate arguments and return types for
@@ -129,13 +138,15 @@ pub extern "C" fn protocol_list_supports_protocol_or_later(
         Err(_) => return 0,
     };
 
-    let is_supported = protover_string_supports_protocol_or_later(
-        protocol_list,
-        protocol,
-        version,
-    );
+    let proto_entry: UnvalidatedProtoEntry = match protocol_list.parse() {
+        Ok(n)  => n,
+        Err(_) => return 1,
+    };
 
-    return if is_supported { 1 } else { 0 };
+    if proto_entry.supports_protocol_or_later(&protocol.into(), &version) {
+        return 1;
+    }
+    0
 }
 
 /// Provide an interface for C to translate arguments and return types for
@@ -150,6 +161,8 @@ pub extern "C" fn protover_get_supported_protocols() -> *const c_char {
 
 /// Provide an interface for C to translate arguments and return types for
 /// protover::compute_vote
+//
+// Why is the threshold a signed integer? —isis
 #[no_mangle]
 pub extern "C" fn protover_compute_vote(
     list: *const Stringlist,
@@ -164,10 +177,19 @@ pub extern "C" fn protover_compute_vote(
     // Dereference of raw pointer requires an unsafe block. The pointer is
     // checked above to ensure it is not null.
     let data: Vec<String> = unsafe { (*list).get_list() };
+    let hold: usize = threshold as usize;
+    let mut proto_entries: Vec<UnvalidatedProtoEntry> = Vec::new();
 
-    let vote = compute_vote(data, threshold);
+    for datum in data {
+        let entry: UnvalidatedProtoEntry = match datum.parse() {
+            Ok(x)  => x,
+            Err(_) => continue,
+        };
+        proto_entries.push(entry);
+    }
+    let vote: UnvalidatedProtoEntry = ProtoverVote::compute(&proto_entries, &hold);
 
-    allocate_and_copy_string(&vote)
+    allocate_and_copy_string(&vote.to_string())
 }
 
 /// Provide an interface for C to translate arguments and return types for
@@ -182,7 +204,7 @@ pub extern "C" fn protover_is_supported_here(
         Err(_) => return 0,
     };
 
-    let is_supported = is_supported_here(protocol, version);
+    let is_supported = is_supported_here(&protocol, &version);
 
     return if is_supported { 1 } else { 0 };
 }

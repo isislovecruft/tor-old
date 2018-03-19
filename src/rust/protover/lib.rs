@@ -34,10 +34,9 @@ extern crate tor_util;
 #[macro_use]
 extern crate tor_log;
 
-mod errors;
-mod protoset;
+pub mod errors;
+pub mod protoset;
 mod protover;
 pub mod ffi;
 
-pub use errors::*;
 pub use protover::*;
