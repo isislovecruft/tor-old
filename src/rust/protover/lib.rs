@@ -31,10 +31,9 @@ extern crate tor_allocate;
 #[macro_use]
 extern crate tor_util;
 
-mod errors;
-mod protoset;
+pub mod errors;
+pub mod protoset;
 mod protover;
 pub mod ffi;
 
-pub use errors::*;
 pub use protover::*;
