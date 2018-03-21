@@ -91,11 +91,7 @@ impl FromStr for UnknownProtocol {
     type Err = ProtoverError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() <= MAX_PROTOCOL_NAME_LENGTH {
-            Ok(UnknownProtocol(s.to_string()))
-        } else {
-            Err(ProtoverError::ExceedsNameLimit)
-        }
+        Ok(UnknownProtocol(s.to_string()))
     }
 }
 
