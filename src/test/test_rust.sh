@@ -3,7 +3,7 @@
 
 set -e
 
-manifests=`find ${abs_top_srcdir:-.}/src/rust/ -mindepth 2 -maxdepth 2 -name 'Cargo.toml'`
+manifests=`find "${abs_top_srcdir:-.}/src/rust/" -mindepth 2 -maxdepth 2 -name 'Cargo.toml'`
 
 exitcode=0
 
